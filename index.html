@@ -957,19 +957,26 @@ function showSetupModal() {
 function closeSetupModal() {
   document.getElementById('setupModal').classList.remove('open');
 }
+// Firebase設定（isasuke139さんのプロジェクト専用）
+const firebaseConfig = {
+  apiKey: "AIzaSyBO6zoUHt2TteX22WKFXaxC0wAzh8lEgtQ",
+  authDomain: "aa--generator.firebaseapp.com",
+  projectId: "aa--generator",
+  storageBucket: "aa--generator.firebasestorage.app",
+  messagingSenderId: "400807317542",
+  appId: "1:400807317542:web:85905aa007f22aa97a96e7",
+  measurementId: "G-QTS2JNGGK1"
+};
 
+// ページ読み込み時に自動でFirebaseを初期化
+if (!firebase.apps.length) {
+  firebase.initializeApp(firebaseConfig);
+  console.log("🔥 Firebase connected automatically!");
+}
+
+// 設定ボタン用の関数は空にしておく（今の設定を上書きさせないため）
 function saveFbCfg() {
-  const raw = document.getElementById('fbCfgInput').value.trim();
-  try {
-    const cfg = JSON.parse(raw);
-    if (!cfg.apiKey || !cfg.authDomain) throw new Error('必須フィールドがありません');
-    localStorage.setItem('aa_fb_cfg', JSON.stringify(cfg));
-    toast('🔥 Firebase設定を保存しました。ページをリロードして接続します。');
-    closeSetupModal();
-    setTimeout(() => location.reload(), 1200);
-  } catch(e) {
-    toast('⚠ JSONが無効です：' + e.message);
-  }
+  closeSetupModal();
 }
 
 // Close modal on backdrop click
