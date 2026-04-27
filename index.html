@@ -11,16 +11,25 @@
 
   window._fbReady = false;
 
-  function tryInit() {
-    const raw = localStorage.getItem('aa_fb_cfg');
-    if (!raw) return;
-    try {
-      const cfg = JSON.parse(raw);
-      const app  = initializeApp(cfg);
-      const auth = getAuth(app);
-      window._auth = auth;
-      window._fbReady = true;
+function tryInit() {
+  try {
+    // 961行目の firebaseConfig を直接使って初期化
+    const app  = initializeApp(firebaseConfig); 
+    const auth = getAuth(app);
+    
+    window._auth = auth;
+    window._fbReady = true;
 
+    // ログイン状態を監視する設定
+    onAuthStateChanged(auth, user => {
+      window._user = user || null;
+      updateAuthUI(user);
+    });
+
+  } catch (e) {
+    console.error("Firebaseの接続に失敗しました:", e);
+  }
+}
       onAuthStateChanged(auth, user => {
         window._user = user || null;
         updateAuthUI(user);
