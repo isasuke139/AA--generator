@@ -3,847 +3,217 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AA_GEN — ASCII Art Generator</title>
+<title>AA_GEN — Gekiga Full Stack</title>
 <script type="module">
   import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-  import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
-    from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+  import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+  import { getFirestore, collection, addDoc, query, where, getDocs, serverTimestamp, orderBy } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
-  window._fbReady = false;
-  function tryInit() {
-    try {
-      const app  = initializeApp(firebaseConfig); 
-      const auth = getAuth(app);
-      window._auth = auth;
-      window._fbReady = true;
-
-      onAuthStateChanged(auth, user => {
-        window._user = user || null;
-        updateAuthUI(user);
-      });
-    } catch (e) {
-      console.error("Firebaseの接続に失敗しました:", e);
-    }
-  } 
-
-  window.googleSignIn = async () => {
-    if (!window._fbReady) { showSetupModal(); return; }
-    try {
-      const provider = new GoogleAuthProvider();
-      await signInWithPopup(window._auth, provider);
-    } catch(e) { console.error(e); }
+  const firebaseConfig = {
+    apiKey: "AIzaSyBO6zoUHt2TteX22WKFXaxC0wAzh8lEgtQ",
+    authDomain: "aa--generator.firebaseapp.com",
+    projectId: "aa--generator",
+    storageBucket: "aa--generator.firebasestorage.app",
+    messagingSenderId: "400807317542",
+    appId: "1:400807317542:web:85905aa007f22aa97a96e7",
+    measurementId: "G-QTS2JNGGK1"
   };
 
-  window.googleSignOut = async () => {
-    if (!window._fbReady) return;
-    await signOut(window._auth);
-  };
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
 
-  function updateAuthUI(user) {
-    const btn  = document.getElementById('authBtn');
-    const info = document.getElementById('userInfo');
-    if (!btn) return;
+  window._state = { user: null, projects: [] };
+
+  onAuthStateChanged(auth, user => {
+    window._state.user = user;
+    const btn = document.getElementById('authBtn');
+    const uinfo = document.getElementById('uinfo');
     if (user) {
       btn.textContent = 'ログアウト';
-      btn.onclick = window.googleSignOut;
-      info.innerHTML = `<img src="${user.photoURL||''}" style="width:22px;height:22px;border-radius:50%;vertical-align:middle;margin-right:6px;">${user.displayName||user.email}`;
-      info.style.display = 'flex';
+      uinfo.innerHTML = `<img src="${user.photoURL}" style="width:24px;border-radius:50%"> ${user.displayName}`;
+      loadGallery();
     } else {
       btn.textContent = 'Googleでログイン';
-      btn.onclick = window.googleSignIn;
-      info.style.display = 'none';
+      uinfo.innerHTML = '';
+      document.getElementById('grid').innerHTML = '<div style="padding:20px;color:#5a5a80;">ログインすると保存した作品が表示されます</div>';
     }
-  }
+  });
 
-  tryInit();
-  window._tryInitFB = tryInit;
+  window.handleAuth = () => window._state.user ? signOut(auth) : signInWithPopup(auth, new GoogleAuthProvider());
+
+  window.saveArt = async () => {
+    if (!window._state.user) return alert("ログインしてください");
+    const name = prompt("作品名を入力してください");
+    if (!name) return;
+    try {
+      await addDoc(collection(db, "projects"), {
+        uid: window._state.user.uid,
+        name: name,
+        ascii: document.getElementById('aout').textContent,
+        createdAt: serverTimestamp(),
+        settings: { ws: document.getElementById('ws').value, egs: document.getElementById('egs').value }
+      });
+      alert("保存しました");
+      loadGallery();
+    } catch (e) { alert("保存に失敗しました"); }
+  };
+
+  async function loadGallery() {
+    const q = query(collection(db, "projects"), where("uid", "==", window._state.user.uid), orderBy("createdAt", "desc"));
+    const snap = await getDocs(q);
+    const grid = document.getElementById('grid');
+    grid.innerHTML = '';
+    snap.forEach(doc => {
+      const p = doc.data();
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.innerHTML = `<div class="card-name">${p.name}</div><pre class="card-pre">${p.ascii.substring(0,80)}...</pre>`;
+      card.onclick = () => { document.getElementById('aout').textContent = p.ascii; switchTab('editor'); };
+      grid.appendChild(card);
+    });
+  }
 </script>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Zen+Kaku+Gothic+New:wght@300;400;700&display=swap');
-:root {
-  --bg:      #08080d;
-  --s1:      #0f0f18;
-  --s2:      #161622;
-  --border:  #252535;
-  --border2: #353550;
-  --acc:     #7affb2;
-  --acc2:    #ff6b6b;
-  --acc3:    #6b9fff;
-  --text:    #dde0f0;
-  --dim:     #5a5a80;
-  --dim2:    #8888aa;
-  --mono:    'Space Mono', monospace;
-  --ui:      'Zen Kaku Gothic New', sans-serif;
-}
+  :root { --bg: #050508; --s1: #0f0f18; --border: #202030; --acc: #7affb2; --text: #dde0f0; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+  
+  header { display: flex; align-items: center; padding: 0 20px; height: 50px; background: var(--s1); border-bottom: 1px solid var(--border); gap: 15px; }
+  .tabs { display: flex; background: #000; border-radius: 6px; padding: 3px; border: 1px solid var(--border); }
+  .tab { padding: 5px 15px; border: none; background: none; color: #5a5a80; cursor: pointer; font-size: 12px; font-weight: bold; }
+  .tab.active { background: var(--s1); color: var(--text); border-radius: 4px; }
+  
+  .view { flex: 1; display: none; overflow: hidden; }
+  .view.active { display: flex; }
 
-*{margin:0;padding:0;box-sizing:border-box}
-html,body{height:100%;overflow:hidden}
-body{background:var(--bg);color:var(--text);font-family:var(--ui);display:flex;flex-direction:column;}
-
-body::before{
-  content:'';position:fixed;inset:0;
-  background-image:
-    linear-gradient(rgba(122,255,178,.025) 1px,transparent 1px),
-    linear-gradient(90deg,rgba(122,255,178,.025) 1px,transparent 1px);
-  background-size:36px 36px;
-  pointer-events:none;z-index:0;
-}
-
-header{
-  position:relative;z-index:10;
-  display:flex;align-items:center;gap:16px;
-  padding:0 20px;height:52px;
-  border-bottom:1px solid var(--border);
-  background:var(--s1);flex-shrink:0;
-}
-.logo{
-  font-family:var(--mono);font-size:15px;
-  color:var(--acc);text-shadow:0 0 14px rgba(122,255,178,.5);
-  letter-spacing:-1px;white-space:nowrap;
-}
-.logo em{color:var(--dim2);font-style:italic;font-size:11px;margin-left:6px;}
-
-.tabs{
-  display:flex;gap:2px;
-  background:var(--bg);border:1px solid var(--border);
-  border-radius:7px;padding:3px;
-}
-.tab{
-  background:none;border:none;
-  color:var(--dim2);font-family:var(--mono);font-size:11px;
-  padding:5px 14px;border-radius:5px;cursor:pointer;
-  transition:all .15s;white-space:nowrap;
-}
-.tab.on{background:var(--s2);color:var(--text);}
-.tab:hover:not(.on){color:var(--text);}
-
-.hspc{flex:1;}
-
-.pname-wrap{
-  display:none;align-items:center;gap:8px;
-  background:var(--bg);border:1px solid var(--border);
-  border-radius:6px;padding:4px 12px;
-}
-.pname-wrap label{font-size:10px;color:var(--dim);font-family:var(--mono);}
-#pname{
-  background:none;border:none;color:var(--text);
-  font-family:var(--mono);font-size:12px;width:150px;outline:none;
-}
-#pname::placeholder{color:var(--dim);}
-
-.savebtn{
-  display:none;
-  background:var(--acc);color:#000;border:none;
-  font-family:var(--mono);font-size:11px;font-weight:700;
-  padding:7px 16px;border-radius:6px;cursor:pointer;
-  transition:all .15s;white-space:nowrap;
-  box-shadow:0 0 12px rgba(122,255,178,.3);
-}
-.savebtn:hover{background:#9effcc;box-shadow:0 0 20px rgba(122,255,178,.5);}
-
-.auth-area{display:flex;align-items:center;gap:10px;}
-#userInfo{
-  display:none;align-items:center;
-  font-family:var(--mono);font-size:11px;color:var(--dim2);
-  max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-}
-#authBtn{
-  background:none;
-  border:1px solid var(--border2);color:var(--dim2);
-  font-family:var(--mono);font-size:11px;
-  padding:6px 13px;border-radius:6px;cursor:pointer;
-  transition:all .15s;white-space:nowrap;
-}
-#authBtn:hover{border-color:var(--acc3);color:var(--acc3);}
-.setup-link{
-  font-family:var(--mono);font-size:10px;color:var(--dim);
-  cursor:pointer;text-decoration:underline;text-underline-offset:2px;
-  transition:color .15s;white-space:nowrap;
-}
-.setup-link:hover{color:var(--dim2);}
-
-.modal-bg{
-  display:none;position:fixed;inset:0;
-  background:rgba(0,0,0,.78);backdrop-filter:blur(4px);
-  z-index:200;align-items:center;justify-content:center;
-}
-.modal-bg.open{display:flex;}
-.modal{
-  background:var(--s1);border:1px solid var(--border2);
-  border-radius:14px;padding:30px 28px;width:min(500px,92vw);
-  position:relative;
-}
-.modal h3{font-family:var(--mono);font-size:14px;color:var(--acc);margin-bottom:6px;}
-.modal .msub{font-size:12px;color:var(--dim2);margin-bottom:20px;line-height:1.75;}
-.modal .msub a{color:var(--acc3);text-decoration:none;}
-.modal .msub a:hover{text-decoration:underline;}
-.modal label{font-size:11px;color:var(--dim2);font-family:var(--mono);display:block;margin-bottom:4px;margin-top:12px;}
-.modal input,.modal textarea{
-  width:100%;background:var(--bg);border:1px solid var(--border);
-  border-radius:6px;color:var(--text);font-family:var(--mono);font-size:12px;
-  padding:8px 11px;outline:none;transition:border-color .15s;
-}
-.modal input:focus,.modal textarea:focus{border-color:var(--acc3);}
-.modal textarea{height:100px;resize:vertical;font-size:11px;}
-.mactions{display:flex;gap:8px;margin-top:20px;justify-content:flex-end;}
-.mok{
-  background:var(--acc3);color:#000;border:none;
-  font-family:var(--mono);font-size:12px;font-weight:700;
-  padding:8px 20px;border-radius:6px;cursor:pointer;transition:all .15s;
-}
-.mok:hover{background:#88b8ff;}
-.mcancel{
-  background:none;border:1px solid var(--border);color:var(--dim2);
-  font-family:var(--mono);font-size:12px;
-  padding:8px 16px;border-radius:6px;cursor:pointer;transition:all .15s;
-}
-.mcancel:hover{border-color:var(--border2);color:var(--text);}
-.mclose{
-  position:absolute;top:13px;right:15px;
-  background:none;border:none;color:var(--dim);font-size:18px;cursor:pointer;
-  transition:color .15s;line-height:1;
-}
-.mclose:hover{color:var(--text);}
-.cfg-st{font-family:var(--mono);font-size:11px;margin-top:8px;}
-.cfg-ok{color:var(--acc);}
-.cfg-no{color:var(--dim2);}
-
-.main{position:relative;z-index:1;display:flex;flex:1;overflow:hidden;}
-
-#gv{display:none;flex-direction:column;flex:1;overflow:hidden;background:var(--bg);}
-#gv.on{display:flex;}
-.g-hdr{
-  padding:20px 28px 14px;
-  display:flex;align-items:center;justify-content:space-between;
-  border-bottom:1px solid var(--border);flex-shrink:0;
-}
-.g-hdr h2{font-family:var(--mono);font-size:13px;color:var(--dim2);letter-spacing:2px;}
-.btn-new{
-  background:none;border:1px solid var(--acc);color:var(--acc);
-  font-family:var(--mono);font-size:11px;
-  padding:6px 16px;border-radius:6px;cursor:pointer;transition:all .15s;
-}
-.btn-new:hover{background:var(--acc);color:#000;}
-
-.g-grid{
-  flex:1;overflow-y:auto;padding:20px 28px;
-  display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));
-  gap:14px;align-content:start;
-}
-.g-empty{
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  flex:1;gap:12px;color:var(--dim);
-  font-family:var(--mono);font-size:12px;text-align:center;
-}
-.g-empty .eg{font-size:44px;opacity:.18;line-height:1;}
-
-.card{
-  background:var(--s1);border:1px solid var(--border);
-  border-radius:10px;overflow:hidden;cursor:pointer;
-  transition:all .2s;position:relative;
-}
-.card:hover{border-color:var(--border2);transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.5);}
-.card-prev{
-  background:var(--bg);padding:10px;height:110px;overflow:hidden;
-  font-family:var(--mono);font-size:2.5px;line-height:1.0;white-space:pre;
-  color:var(--text);user-select:none;
-}
-.card-info{padding:9px 12px;border-top:1px solid var(--border);}
-.card-name{font-size:13px;font-weight:700;margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.card-meta{font-family:var(--mono);font-size:10px;color:var(--dim);}
-.card-del{
-  position:absolute;top:5px;right:5px;
-  background:rgba(255,107,107,.12);border:1px solid rgba(255,107,107,.25);
-  color:var(--acc2);border-radius:4px;width:22px;height:22px;
-  display:flex;align-items:center;justify-content:center;
-  font-size:11px;cursor:pointer;opacity:0;transition:opacity .15s;
-}
-.card:hover .card-del{opacity:1;}
-
-#ev{display:none;flex:1;overflow:hidden;}
-#ev.on{display:flex;}
-
-.pleft{
-  width:288px;flex-shrink:0;
-  background:var(--s1);border-right:1px solid var(--border);
-  display:flex;flex-direction:column;overflow-y:auto;
-}
-.psec{padding:16px 18px;border-bottom:1px solid var(--border);}
-.psec:last-child{border-bottom:none;}
-
-.slabel{
-  font-family:var(--mono);font-size:9px;letter-spacing:3px;color:var(--dim);
-  text-transform:uppercase;margin-bottom:12px;
-  display:flex;align-items:center;gap:8px;
-}
-.slabel::after{content:'';flex:1;height:1px;background:var(--border);}
-
-.dz{
-  border:2px dashed var(--border2);border-radius:8px;
-  padding:22px 10px;text-align:center;cursor:pointer;
-  transition:all .2s;
-}
-.dz:hover,.dz.dov{border-color:var(--acc);box-shadow:0 0 14px rgba(122,255,178,.1);}
-.dz-icon{font-size:26px;display:block;margin-bottom:8px;}
-.dz p{font-size:12px;color:var(--dim2);line-height:1.7;}
-.dz strong{color:var(--acc);cursor:pointer;}
-#fi{display:none;}
-#prev{width:100%;border-radius:6px;display:none;border:1px solid var(--border);margin-top:10px;}
-
-.sr{display:flex;align-items:center;gap:8px;margin-bottom:9px;}
-.sr:last-child{margin-bottom:0;}
-.sr label{font-size:11px;color:var(--dim2);min-width:68px;}
-.sr input[type=range]{
-  flex:1;-webkit-appearance:none;height:3px;
-  background:var(--border2);border-radius:2px;outline:none;cursor:pointer;
-}
-.sr input[type=range]::-webkit-slider-thumb{
-  -webkit-appearance:none;width:12px;height:12px;border-radius:50%;
-  background:var(--acc);box-shadow:0 0 7px rgba(122,255,178,.6);cursor:pointer;
-}
-.sv{font-family:var(--mono);font-size:11px;color:var(--acc);width:32px;text-align:right;flex-shrink:0;}
-
-.csel{
-  width:100%;background:var(--bg);border:1px solid var(--border);
-  border-radius:6px;color:var(--text);
-  font-family:var(--mono);font-size:12px;
-  padding:7px 10px;cursor:pointer;outline:none;transition:border-color .15s;
-}
-.csel:hover,.csel:focus{border-color:var(--border2);}
-.cinput{
-  display:none;margin-top:7px;width:100%;background:var(--bg);
-  border:1px solid var(--border);border-radius:6px;
-  color:var(--text);font-family:var(--mono);font-size:12px;
-  padding:7px 10px;outline:none;transition:border-color .15s;
-}
-.cinput:focus{border-color:var(--acc);}
-.chint{font-size:10px;color:var(--dim);margin-top:5px;line-height:1.5;display:none;}
-
-.tr{display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--dim2);margin-bottom:9px;}
-.tr:last-child{margin-bottom:0;}
-.tog{position:relative;width:32px;height:17px;}
-.tog input{display:none;}
-.tog-t{
-  position:absolute;inset:0;background:var(--border2);
-  border-radius:9px;cursor:pointer;transition:background .2s;
-}
-.tog input:checked+.tog-t{background:var(--acc);}
-.tog-t::after{
-  content:'';position:absolute;top:2px;left:2px;
-  width:13px;height:13px;background:#fff;border-radius:50%;transition:transform .2s;
-}
-.tog input:checked+.tog-t::after{transform:translateX(15px);}
-
-.pright{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--bg);}
-
-.obar{
-  padding:9px 18px;border-bottom:1px solid var(--border);
-  display:flex;align-items:center;gap:9px;flex-shrink:0;background:var(--s1);
-}
-.oinfo{font-family:var(--mono);font-size:11px;color:var(--dim);flex:1;}
-.obtn{
-  background:var(--s2);border:1px solid var(--border);color:var(--dim2);
-  font-family:var(--mono);font-size:11px;
-  padding:5px 11px;border-radius:5px;cursor:pointer;transition:all .15s;white-space:nowrap;
-}
-.obtn:hover{border-color:var(--border2);color:var(--text);}
-
-.fsr{
-  display:flex;align-items:center;gap:9px;padding:8px 18px;
-  border-bottom:1px solid var(--border);background:var(--s1);flex-shrink:0;
-}
-.fsr label{font-size:11px;color:var(--dim);font-family:var(--mono);white-space:nowrap;}
-.fsr input[type=range]{
-  flex:1;-webkit-appearance:none;height:3px;
-  background:var(--border2);border-radius:2px;outline:none;cursor:pointer;
-}
-.fsr input[type=range]::-webkit-slider-thumb{
-  -webkit-appearance:none;width:12px;height:12px;border-radius:50%;
-  background:var(--acc3);box-shadow:0 0 7px rgba(107,159,255,.6);cursor:pointer;
-}
-.fsr .sv{color:var(--acc3);}
-
-.oscroll{flex:1;overflow:auto;padding:18px;}
-
-.estate{
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  height:100%;gap:12px;color:var(--dim);
-  font-family:var(--mono);font-size:12px;text-align:center;
-}
-.estate .ec{font-size:44px;opacity:.14;line-height:1;letter-spacing:-4px;}
-
-.ldng{
-  display:none;flex-direction:column;align-items:center;justify-content:center;
-  height:100%;gap:12px;color:var(--acc);font-family:var(--mono);font-size:12px;
-}
-.dots{display:flex;gap:5px;}
-.dots span{
-  width:6px;height:6px;border-radius:50%;background:var(--acc);
-  animation:bk 1s ease-in-out infinite;
-}
-.dots span:nth-child(2){animation-delay:.15s;}
-.dots span:nth-child(3){animation-delay:.3s;}
-@keyframes bk{0%,80%,100%{opacity:.2;transform:scale(.8);}40%{opacity:1;transform:scale(1);}}
-
-#aout{font-family:var(--mono);white-space:pre;display:inline-block;color:var(--text);}
-
-canvas{display:none;}
-
-::-webkit-scrollbar{width:5px;height:5px;}
-::-webkit-scrollbar-track{background:transparent;}
-::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
-
-.toast{
-  position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(8px);
-  background:var(--s2);border:1px solid var(--border2);
-  color:var(--text);font-family:var(--mono);font-size:12px;
-  padding:9px 18px;border-radius:8px;
-  opacity:0;transition:all .22s;pointer-events:none;z-index:1000;white-space:nowrap;
-}
-.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  /* Editor */
+  .side { width: 280px; background: var(--s1); border-right: 1px solid var(--border); padding: 20px; display: flex; flex-direction: column; gap: 20px; }
+  .main-out { flex: 1; background: #000; display: flex; flex-direction: column; overflow: hidden; }
+  #aout { font-family: 'Courier New', monospace; font-size: 8px; line-height: 0.82; white-space: pre; color: #fff; letter-spacing: -1px; margin: 0; padding: 20px; }
+  
+  .label { font-size: 10px; font-weight: bold; color: #5a5a80; letter-spacing: 1px; }
+  input[type=range] { width: 100%; accent-color: var(--acc); }
+  .btn { background: var(--acc); color: #000; border: none; padding: 10px; border-radius: 6px; font-weight: bold; cursor: pointer; }
+  
+  /* Gallery */
+  #gallery { padding: 30px; overflow-y: auto; display: block; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; }
+  .card { background: var(--s1); border: 1px solid var(--border); padding: 15px; border-radius: 10px; cursor: pointer; }
+  .card-name { font-weight: bold; margin-bottom: 8px; font-size: 13px; }
+  .card-pre { font-size: 3px; line-height: 1; height: 50px; overflow: hidden; background: #000; padding: 5px; color: #555; }
 </style>
 </head>
 <body>
 
 <header>
-  <div class="logo">// AA_GEN <em>v2</em></div>
+  <div style="font-weight:bold; color:var(--acc);">AA_GEN v2.5</div>
   <div class="tabs">
-    <button class="tab on" id="tg" onclick="showTab('g')">📁 ギャラリー</button>
-    <button class="tab"    id="te" onclick="showTab('e')">✏️ エディター</button>
+    <button class="tab active" id="t-gallery" onclick="switchTab('gallery')">コレクション</button>
+    <button class="tab" id="t-editor" onclick="switchTab('editor')">エディター</button>
   </div>
-  <div class="hspc"></div>
-  <div class="pname-wrap" id="pnw">
-    <label>名前：</label>
-    <input id="pname" placeholder="無題のAA" maxlength="40">
-  </div>
-  <button class="savebtn" id="sbtn" onclick="saveProj()">💾 保存</button>
-  <div class="auth-area">
-    <span id="userInfo"></span>
-    <button id="authBtn" onclick="window.googleSignIn ? window.googleSignIn() : showSetupModal()">Googleでログイン</button>
-    <span class="setup-link" onclick="showSetupModal()">⚙ Firebase設定</span>
-  </div>
+  <div style="flex:1"></div>
+  <div id="uinfo" style="display:flex; align-items:center; gap:8px; font-size:12px;"></div>
+  <button id="authBtn" class="btn" style="width:auto; padding:5px 12px;" onclick="handleAuth()">ログイン</button>
 </header>
 
-<div class="modal-bg" id="setupModal">
-  <div class="modal">
-    <button class="mclose" onclick="closeSetupModal()">✕</button>
-    <h3>// Firebase 設定</h3>
-    <p class="msub">
-      Googleログインを使うには Firebase プロジェクトの設定が必要です。<br>
-      <a href="https://console.firebase.google.com/" target="_blank">Firebase Console</a> でプロジェクトを作成し、
-      「Authentication → Sign-in method → Google」を有効化してから、
-      プロジェクト設定の「firebaseConfig」オブジェクトを以下に貼り付けてください。
-    </p>
-    <div id="cfgStatus" class="cfg-st"></div>
-    <label>firebaseConfig（JSON形式で貼り付け）</label>
-    <textarea id="fbCfgInput" placeholder='{ "apiKey": "..." }'></textarea>
-    <div class="mactions">
-      <button class="mcancel" onclick="closeSetupModal()">キャンセル</button>
-      <button class="mok" onclick="saveFbCfg()">保存して接続</button>
+<div id="gallery" class="view active">
+  <h2 style="margin-bottom:20px;">マイギャラリー</h2>
+  <div id="grid" class="grid"></div>
+</div>
+
+<div id="editor" class="view">
+  <div class="side">
+    <div>
+      <div class="label">画像選択</div>
+      <input type="file" id="fi" accept="image/*" style="font-size:11px; margin-top:8px;">
     </div>
+    <div>
+      <div class="label">解像度 (幅)</div>
+      <input type="range" id="ws" min="50" max="300" value="120">
+    </div>
+    <div>
+      <div class="label">劇画エッジ (輪郭)</div>
+      <input type="range" id="egs" min="50" max="250" value="160">
+    </div>
+    <div>
+      <div class="label">密度 (ガンマ)</div>
+      <input type="range" id="gms" min="20" max="150" value="60">
+    </div>
+    <button class="btn" onclick="saveArt()">作品を保存</button>
+  </div>
+  <div class="main-out" style="overflow:auto;">
+    <pre id="aout"></pre>
   </div>
 </div>
 
-<div class="main">
-  <div id="gv" class="on">
-    <div class="g-hdr">
-      <h2>// SAVED WORKS</h2>
-      <button class="btn-new" onclick="newProj()">＋ 新規作成</button>
-    </div>
-    <div id="gc"></div>
-  </div>
-
-  <div id="ev">
-    <div class="pleft">
-      <div class="psec">
-        <div class="slabel">画像</div>
-        <div class="dz" id="dz">
-          <span class="dz-icon">⬡</span>
-          <p>ドラッグ＆ドロップ<br>または <strong onclick="document.getElementById('fi').click()">ファイルを選択</strong></p>
-        </div>
-        <input type="file" id="fi" accept="image/*">
-        <img id="prev" alt="preview">
-      </div>
-      <div class="psec">
-        <div class="slabel">出力サイズ</div>
-        <div class="sr">
-          <label>幅（文字）</label>
-          <input type="range" id="ws" min="20" max="300" value="100">
-          <span class="sv" id="wv">100</span>
-        </div>
-      </div>
-      <div class="psec">
-        <div class="slabel">文字セット</div>
-        <select class="csel" id="cs">
-          <option value="standard">標準（10段階）</option>
-          <option value="dense">詳細（70段階）</option>
-          <option value="block">ブロック（░▒▓█）</option>
-          <option value="binary">バイナリ（0/1）</option>
-          <option value="dots">ブライユ点字</option>
-          <option value="katakana">カタカナ</option>
-          <option value="custom">カスタム入力</option>
-        </select>
-        <input type="text" class="cinput" id="cc" placeholder="明→暗の順で文字を入力">
-        <p class="chint" id="ch">全角・半角混在は自動調整されます</p>
-      </div>
-      <div class="psec">
-        <div class="slabel">補正</div>
-        <div class="sr">
-          <label>コントラスト</label>
-          <input type="range" id="cns" min="-100" max="100" value="0">
-          <span class="sv" id="cnv">0</span>
-        </div>
-        <div class="sr">
-          <label>明度</label>
-          <input type="range" id="brs" min="-100" max="100" value="0">
-          <span class="sv" id="brv">0</span>
-        </div>
-      </div>
-      <div class="psec">
-        <div class="slabel">オプション</div>
-        <div class="tr"><span>カラー出力</span>
-          <label class="tog"><input type="checkbox" id="ct"><div class="tog-t"></div></label></div>
-        <div class="tr"><span>白黒反転</span>
-          <label class="tog"><input type="checkbox" id="inv"><div class="tog-t"></div></label></div>
-        <div class="tr"><span>全角に統一</span>
-          <label class="tog"><input type="checkbox" id="fw" checked><div class="tog-t"></div></label></div>
-      </div>
-    </div>
-    <div class="pright">
-      <div class="obar">
-        <span class="oinfo" id="oinfo">—</span>
-        <button class="obtn" onclick="copyA()">コピー</button>
-        <button class="obtn" onclick="dlTxt()">保存(.txt)</button>
-      </div>
-      <div class="fsr">
-        <label>表示サイズ</label>
-        <input type="range" id="fss" min="4" max="20" value="8">
-        <span class="sv" id="fsv">8px</span>
-      </div>
-      <div class="oscroll">
-        <div class="estate" id="est">
-          <div class="ec">░▒▓█</div>
-          <p>画像をアップロードすると<br>リアルタイムで生成されます</p>
-        </div>
-        <div class="ldng" id="ld">
-          <div class="dots"><span></span><span></span><span></span></div>
-          <span>変換中...</span>
-        </div>
-        <pre id="aout"></pre>
-      </div>
-    </div>
-  </div>
-</div>
-
-<canvas id="cv"></canvas>
-<div class="toast" id="toast"></div>
+<canvas id="cv" style="display:none"></canvas>
 
 <script>
-// ─── CHARSETS ───────────────────────────────
-const CS = {
-  standard: ' .:-=+*#%@',
-  dense:    " .'`^\",:;Il!i><~+_-?][}{1)(|\\/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$",
-  block:    ' ░▒▓█',
-  binary:   '01',
-  dots:     '⠀⠁⠃⠇⠏⠟⠿⣿',
-  katakana: 'ｦｧｨｩｪｫｬｭｮｯｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ',
-};
+  const CHARS = "$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/\\|()1{}[]?-_+~<>i!lI;:,\"^`'. ".split("");
+  let currentImg = null;
 
-// ─── STATE ──────────────────────────────────
-let img = null, rawAscii = '', projId = null, rtimer = null;
+  function switchTab(id) {
+    document.querySelectorAll('.view, .tab').forEach(el => el.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    document.getElementById('t-' + id).classList.add('active');
+  }
 
-// ─── TABS ───────────────────────────────────
-function showTab(t) {
-  ['g','e'].forEach(x => {
-    document.getElementById(x+'v').classList.toggle('on', x===t);
-    document.getElementById('t'+x).classList.toggle('on', x===t);
-  });
-  document.getElementById('pnw').style.display = t==='e' ? 'flex'  : 'none';
-  document.getElementById('sbtn').style.display = t==='e' ? 'block' : 'none';
-  if (t==='g') renderGallery();
-}
-
-function newProj() {
-  projId = null; img = null; rawAscii = '';
-  document.getElementById('pname').value = '';
-  document.getElementById('prev').style.display = 'none';
-  document.getElementById('dz').style.display = '';
-  document.getElementById('aout').textContent = '';
-  document.getElementById('est').style.display = 'flex';
-  document.getElementById('ld').style.display = 'none';
-  document.getElementById('oinfo').textContent = '—';
-  showTab('e');
-}
-
-// ─── IMAGE ──────────────────────────────────
-const dz = document.getElementById('dz');
-const fi = document.getElementById('fi');
-dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('dov'); });
-dz.addEventListener('dragleave', () => dz.classList.remove('dov'));
-dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('dov'); loadFile(e.dataTransfer.files[0]); });
-fi.addEventListener('change', e => loadFile(e.target.files[0]));
-
-function loadFile(f) {
-  if (!f || !f.type.startsWith('image/')) return;
-  const r = new FileReader();
-  r.onload = ev => {
-    const i = new Image();
-    i.onload = () => {
-      img = i;
-      const p = document.getElementById('prev');
-      p.src = ev.target.result;
-      p.style.display = 'block';
-      dz.style.display = 'none';
-      sched();
+  document.getElementById('fi').onchange = e => {
+    const r = new FileReader();
+    r.onload = ev => {
+      currentImg = new Image();
+      currentImg.onload = render;
+      currentImg.src = ev.target.result;
     };
-    i.src = ev.target.result;
+    r.readAsDataURL(e.target.files[0]);
   };
-  r.readAsDataURL(f);
-}
 
-// ─── CONTROLS ──────────────────────────────
-function bindS(id, vid, sfx) {
-  const s = document.getElementById(id), v = document.getElementById(vid);
-  s.addEventListener('input', () => { v.textContent = s.value + (sfx || ''); sched(); });
-}
-bindS('ws', 'wv');
-bindS('cns', 'cnv');
-bindS('brs', 'brv');
-bindS('fss', 'fsv', 'px');
-document.getElementById('cs').onchange = () => {
-  const isC = document.getElementById('cs').value === 'custom';
-  document.getElementById('cc').style.display = isC ? 'block' : 'none';
-  document.getElementById('ch').style.display = isC ? 'block' : 'none';
-  sched();
-};
-document.getElementById('cc').oninput = sched;
-document.getElementById('ct').onchange = sched;
-document.getElementById('inv').onchange = sched;
-document.getElementById('fw').onchange = sched;
-document.getElementById('fss').addEventListener('input', () => {
-  document.getElementById('aout').style.fontSize = document.getElementById('fss').value + 'px';
-});
+  ['ws', 'egs', 'gms'].forEach(id => document.getElementById(id).oninput = render);
 
-// ─── CORE LOGIC ─────────────────────────────
-function sched() {
-  if (!img) return;
-  if (rtimer) clearTimeout(rtimer);
-  document.getElementById('est').style.display = 'none';
-  document.getElementById('ld').style.display = 'flex';
-  rtimer = setTimeout(run, 50);
-}
+  function render() {
+    if (!currentImg) return;
+    const canvas = document.getElementById('cv');
+    const ctx = canvas.getContext('2d');
+    const W = +document.getElementById('ws').value;
+    const edgeStr = +document.getElementById('egs').value;
+    const gamma = +document.getElementById('gms').value / 100;
+    const H = Math.round(W * (currentImg.height / currentImg.width) * 0.54);
+    canvas.width = W; canvas.height = H;
 
-function run() {
-  const { plain, html } = buildAA();
-  rawAscii = plain;
-  document.getElementById('aout').innerHTML = html || plain;
-  document.getElementById('ld').style.display = 'none';
-  const lines = plain.split('\n');
-  document.getElementById('oinfo').textContent = `${lines[0].length} x ${lines.length} chars`;
-}
+    ctx.filter = `contrast(180%) grayscale(100%) brightness(85%)`;
+    ctx.drawImage(currentImg, 0, 0, W, H);
+    const src = ctx.getImageData(0, 0, W, H);
+    const data = src.data;
 
-function applyEdgeDetection(data, w, h, strength) {
-  const out = new Uint8ClampedArray(data.length);
-  for (let y = 1; y < h - 1; y++) {
-    for (let x = 1; x < w - 1; x++) {
-      const i = (y * w + x) * 4;
-      // Sobelフィルタで境界線を探す
-      const gx = 
-        -1*data[((y-1)*w+(x-1))*4] + 1*data[((y-1)*w+(x+1))*4] +
-        -2*data[(y*w+(x-1))*4]     + 2*data[(y*w+(x+1))*4] +
-        -1*data[((y+1)*w+(x-1))*4] + 1*data[((y+1)*w+(x+1))*4];
-      const gy = 
-        -1*data[((y-1)*w+(x-1))*4] - 2*data[((y-1)*w+x)*4] - 1*data[((y-1)*w+(x+1))*4] +
-         1*data[((y+1)*w+(x-1))*4] + 2*data[((y+1)*w+x)*4] + 1*data[((y+1)*w+(x+1))*4];
-      
-      const edge = Math.sqrt(gx*gx + gy*gy);
-      // 元の明るさにエッジを「加算」する。エッジ部分はより暗く（またはより濃い文字に）なる。
-      const val = Math.max(0, Math.min(255, data[i] - (edge * (strength/100))));
-      out[i] = out[i+1] = out[i+2] = val;
-      out[i+3] = 255;
-    }
-  }
-  return out;
-}
-
-function buildAA() {
-  const canvas = document.getElementById('cv');
-  const ctx = canvas.getContext('2d');
-  const W = +document.getElementById('ws').value;
-  const csKey = document.getElementById('cs').value;
-  let rawC = csKey === 'custom' ? (document.getElementById('cc').value || CS.standard) : CS[csKey];
-  const inv = document.getElementById('inv').checked;
-  const color = document.getElementById('ct').checked;
-  const fwOn = document.getElementById('fw').checked;
-  const ctrst = +document.getElementById('cns').value;
-  const brt = +document.getElementById('brs').value;
-
-  if (inv) rawC = [...rawC].reverse().join('');
-  const ca = [...rawC];
-
-  const hratio = 0.5; 
-  const ar = img.height / img.width;
-  const pxW = W;
-  const pxH = Math.max(1, Math.round(W * ar * hratio));
-
-  canvas.width = pxW;
-  canvas.height = pxH;
-  ctx.filter = `contrast(${100+ctrst}%) brightness(${100+brt}%) grayscale(100%)`;
-  ctx.drawImage(img, 0, 0, pxW, pxH);
-  ctx.filter = 'none';
-
-  const imageData = ctx.getImageData(0, 0, pxW, pxH);
-  // 【修正】エッジを強調しつつ、元の階調を活かす
-  const processedData = applyEdgeDetection(imageData.data, pxW, pxH, 45);
-
-  const pl = [], hl = [];
-  for (let y = 0; y < pxH; y++) {
-    let pr = '', hr = '';
-    for (let x = 0; x < pxW; x++) {
-      const i = (y * pxW + x) * 4;
-      const lum = processedData[i]; 
-      
-      // 元の明るさをそのままインデックスに使う
-      let idx = Math.floor((lum / 256) * ca.length);
-      let ch = ca[idx] || ca[ca.length-1];
-
-      if (fwOn || csKey === 'dots' || csKey === 'katakana') {
-        const cp = ch.codePointAt(0);
-        if (cp >= 0x21 && cp <= 0x7E) ch = String.fromCodePoint(cp + 0xFEE0);
-        else if (ch === ' ' || !ch) ch = '　'; 
-      } else {
-        if (!ch || ch === '') ch = ' ';
-      }
-
-      pr += ch;
-      if (color) {
-        const r = imageData.data[i], g = imageData.data[i+1], b = imageData.data[i+2];
-        hr += `<span style="color:rgb(${r},${g},${b})">${ch}</span>`;
+    const edges = new Float32Array(W * H);
+    for (let y = 1; y < H - 1; y++) {
+      for (let x = 1; x < W - 1; x++) {
+        const i = (y * W + x) * 4;
+        const gx = -data[((y-1)*W+x-1)*4] + data[((y-1)*W+x+1)*4] - 2*data[(y*W+x-1)*4] + 2*data[(y*W+x+1)*4];
+        const gy = -data[((y-1)*W+x-1)*4] - 2*data[((y-1)*W+x)*4] + data[((y+1)*W+x-1)*4] + 2*data[((y+1)*W+x)*4];
+        edges[y * W + x] = Math.sqrt(gx*gx + gy*gy);
       }
     }
-    pl.push(pr);
-    if (color) hl.push(hr);
+
+    let res = "";
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const i = y * W + x;
+        const lum = data[i * 4];
+        const e = edges[i];
+        let cIdx;
+        if (e > (255 - edgeStr)) {
+          cIdx = 0; 
+        } else {
+          const v = Math.pow(lum / 255, gamma);
+          cIdx = Math.floor(v * (CHARS.length - 1));
+        }
+        res += CHARS[cIdx];
+      }
+      res += "\n";
+    }
+    document.getElementById('aout').textContent = res;
   }
-  return { plain: pl.join('\n'), html: hl.join('\n') };
-}
-
-// ─── UTIL ───────────────────────────────────
-function copyA() {
-  navigator.clipboard.writeText(rawAscii).then(() => toast('コピーしました！'));
-}
-function dlTxt() {
-  const b = new Blob([rawAscii], {type:'text/plain'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(b);
-  a.download = (document.getElementById('pname').value || 'art') + '.txt';
-  a.click();
-}
-function toast(m) {
-  const t = document.getElementById('toast');
-  t.textContent = m; t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2000);
-}
-
-// ─── GALLERY ────────────────────────────────
-function saveProj() {
-  const n = document.getElementById('pname').value || '無題のAA';
-  const data = {
-    id: projId || Date.now().toString(),
-    name: n,
-    ascii: rawAscii,
-    date: new Date().toLocaleString()
-  };
-  let items = JSON.parse(localStorage.getItem('aa_items') || '[]');
-  const idx = items.findIndex(x => x.id === data.id);
-  if (idx > -1) items[idx] = data; else items.unshift(data);
-  localStorage.setItem('aa_items', JSON.stringify(items));
-  toast('保存しました');
-}
-
-function renderGallery() {
-  const c = document.getElementById('gc');
-  const items = JSON.parse(localStorage.getItem('aa_items') || '[]');
-  if (!items.length) {
-    c.innerHTML = '<div class="g-empty"><div class="eg">⬡</div><p>保存された作品はありません</p></div>';
-    return;
-  }
-  c.innerHTML = items.map(item => `
-    <div class="card" onclick="loadProj('${item.id}')">
-      <div class="card-prev">${item.ascii.substring(0, 500)}</div>
-      <div class="card-info">
-        <div class="card-name">${item.name}</div>
-        <div class="card-meta">${item.date}</div>
-      </div>
-      <div class="card-del" onclick="event.stopPropagation();delProj('${item.id}')">✕</div>
-    </div>
-  `).join('');
-}
-
-window.loadProj = (id) => {
-  const items = JSON.parse(localStorage.getItem('aa_items') || '[]');
-  const item = items.find(x => x.id === id);
-  if (!item) return;
-  projId = item.id;
-  document.getElementById('pname').value = item.name;
-  rawAscii = item.ascii;
-  document.getElementById('aout').textContent = rawAscii;
-  document.getElementById('est').style.display = 'none';
-  showTab('e');
-};
-
-window.delProj = (id) => {
-  if (!confirm('削除しますか？')) return;
-  let items = JSON.parse(localStorage.getItem('aa_items') || '[]');
-  items = items.filter(x => x.id !== id);
-  localStorage.setItem('aa_items', JSON.stringify(items));
-  renderGallery();
-};
-
-// ─── FIREBASE MODAL ─────────────────────────
-function showSetupModal() {
-  const raw = localStorage.getItem('fb_config');
-  const st  = document.getElementById('cfgStatus');
-  if (raw) {
-    try {
-      JSON.parse(raw);
-      st.className = 'cfg-st cfg-ok';
-      st.textContent = '✓ 設定済み（接続中）';
-      document.getElementById('fbCfgInput').value = JSON.stringify(JSON.parse(raw), null, 2);
-    } catch { st.className='cfg-st cfg-no'; st.textContent='⚠ 設定が無効です'; }
-  } else {
-    st.className = 'cfg-st cfg-no';
-    st.textContent = '未設定';
-    document.getElementById('fbCfgInput').value = '';
-  }
-  document.getElementById('setupModal').classList.add('open');
-}
-
-function closeSetupModal() {
-  document.getElementById('setupModal').classList.remove('open');
-}
-
-function saveFbCfg() {
-  const val = document.getElementById('fbCfgInput').value;
-  try {
-    JSON.parse(val);
-    localStorage.setItem('fb_config', val);
-    toast('設定を保存しました。再読み込みします...');
-    setTimeout(() => location.reload(), 1000);
-  } catch (e) { alert('JSONの形式が正しくありません'); }
-}
-
-// Firebase設定（isasuke139さんのプロジェクト専用）
-const firebaseConfig = {
-  apiKey: "AIzaSyBO6zoUHt2TteX22WKFXaxC0wAzh8lEgtQ",
-  authDomain: "aa--generator.firebaseapp.com",
-  projectId: "aa--generator",
-  storageBucket: "aa--generator.firebasestorage.app",
-  messagingSenderId: "400807317542",
-  appId: "1:400807317542:web:85905aa007f22aa97a96e7",
-  measurementId: "G-QTS2JNGGK1"
-};
-
-renderGallery();
 </script>
 </body>
 </html>
