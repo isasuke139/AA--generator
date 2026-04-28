@@ -10,24 +10,21 @@
     from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 
   window._fbReady = false;
+  function tryInit() {
+    try {
+      const app  = initializeApp(firebaseConfig); 
+      const auth = getAuth(app);
+      window._auth = auth;
+      window._fbReady = true;
 
-function tryInit() {
-  try {
-    const app  = initializeApp(firebaseConfig); 
-    const auth = getAuth(app);
-    
-    window._auth = auth;
-    window._fbReady = true;
-
-    onAuthStateChanged(auth, user => {
-      window._user = user || null;
-      updateAuthUI(user);
-    });
-
-  } catch (e) {
-    console.error("Firebaseの接続に失敗しました:", e);
-  }
-} 
+      onAuthStateChanged(auth, user => {
+        window._user = user || null;
+        updateAuthUI(user);
+      });
+    } catch (e) {
+      console.error("Firebaseの接続に失敗しました:", e);
+    }
+  } 
 
   window.googleSignIn = async () => {
     if (!window._fbReady) { showSetupModal(); return; }
@@ -63,7 +60,6 @@ function tryInit() {
 </script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Zen+Kaku+Gothic+New:wght@300;400;700&display=swap');
-
 :root {
   --bg:      #08080d;
   --s1:      #0f0f18;
@@ -93,7 +89,6 @@ body::before{
   pointer-events:none;z-index:0;
 }
 
-/* ── HEADER ── */
 header{
   position:relative;z-index:10;
   display:flex;align-items:center;gap:16px;
@@ -146,7 +141,6 @@ header{
 }
 .savebtn:hover{background:#9effcc;box-shadow:0 0 20px rgba(122,255,178,.5);}
 
-/* ── AUTH ── */
 .auth-area{display:flex;align-items:center;gap:10px;}
 #userInfo{
   display:none;align-items:center;
@@ -168,7 +162,6 @@ header{
 }
 .setup-link:hover{color:var(--dim2);}
 
-/* ── MODAL ── */
 .modal-bg{
   display:none;position:fixed;inset:0;
   background:rgba(0,0,0,.78);backdrop-filter:blur(4px);
@@ -215,10 +208,8 @@ header{
 .cfg-ok{color:var(--acc);}
 .cfg-no{color:var(--dim2);}
 
-/* ── MAIN ── */
 .main{position:relative;z-index:1;display:flex;flex:1;overflow:hidden;}
 
-/* ── GALLERY ── */
 #gv{display:none;flex-direction:column;flex:1;overflow:hidden;background:var(--bg);}
 #gv.on{display:flex;}
 .g-hdr{
@@ -269,7 +260,6 @@ header{
 }
 .card:hover .card-del{opacity:1;}
 
-/* ── EDITOR ── */
 #ev{display:none;flex:1;overflow:hidden;}
 #ev.on{display:flex;}
 
@@ -288,7 +278,6 @@ header{
 }
 .slabel::after{content:'';flex:1;height:1px;background:var(--border);}
 
-/* drop */
 .dz{
   border:2px dashed var(--border2);border-radius:8px;
   padding:22px 10px;text-align:center;cursor:pointer;
@@ -301,7 +290,6 @@ header{
 #fi{display:none;}
 #prev{width:100%;border-radius:6px;display:none;border:1px solid var(--border);margin-top:10px;}
 
-/* sliders */
 .sr{display:flex;align-items:center;gap:8px;margin-bottom:9px;}
 .sr:last-child{margin-bottom:0;}
 .sr label{font-size:11px;color:var(--dim2);min-width:68px;}
@@ -315,7 +303,6 @@ header{
 }
 .sv{font-family:var(--mono);font-size:11px;color:var(--acc);width:32px;text-align:right;flex-shrink:0;}
 
-/* select */
 .csel{
   width:100%;background:var(--bg);border:1px solid var(--border);
   border-radius:6px;color:var(--text);
@@ -332,7 +319,6 @@ header{
 .cinput:focus{border-color:var(--acc);}
 .chint{font-size:10px;color:var(--dim);margin-top:5px;line-height:1.5;display:none;}
 
-/* toggle */
 .tr{display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--dim2);margin-bottom:9px;}
 .tr:last-child{margin-bottom:0;}
 .tog{position:relative;width:32px;height:17px;}
@@ -348,7 +334,6 @@ header{
 }
 .tog input:checked+.tog-t::after{transform:translateX(15px);}
 
-/* right */
 .pright{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--bg);}
 
 .obar{
@@ -422,21 +407,16 @@ canvas{display:none;}
 
 <header>
   <div class="logo">// AA_GEN <em>v2</em></div>
-
   <div class="tabs">
     <button class="tab on" id="tg" onclick="showTab('g')">📁 ギャラリー</button>
     <button class="tab"    id="te" onclick="showTab('e')">✏️ エディター</button>
   </div>
-
   <div class="hspc"></div>
-
   <div class="pname-wrap" id="pnw">
     <label>名前：</label>
     <input id="pname" placeholder="無題のAA" maxlength="40">
   </div>
-
   <button class="savebtn" id="sbtn" onclick="saveProj()">💾 保存</button>
-
   <div class="auth-area">
     <span id="userInfo"></span>
     <button id="authBtn" onclick="window.googleSignIn ? window.googleSignIn() : showSetupModal()">Googleでログイン</button>
@@ -444,7 +424,6 @@ canvas{display:none;}
   </div>
 </header>
 
-<!-- Firebase setup modal -->
 <div class="modal-bg" id="setupModal">
   <div class="modal">
     <button class="mclose" onclick="closeSetupModal()">✕</button>
@@ -453,19 +432,11 @@ canvas{display:none;}
       Googleログインを使うには Firebase プロジェクトの設定が必要です。<br>
       <a href="https://console.firebase.google.com/" target="_blank">Firebase Console</a> でプロジェクトを作成し、
       「Authentication → Sign-in method → Google」を有効化してから、
-      プロジェクト設定の「firebaseConfig」オブジェクトを以下に貼り付けてください。<br>
-      また、<strong>承認済みドメイン</strong>にこのページのドメインを追加してください。
+      プロジェクト設定の「firebaseConfig」オブジェクトを以下に貼り付けてください。
     </p>
     <div id="cfgStatus" class="cfg-st"></div>
     <label>firebaseConfig（JSON形式で貼り付け）</label>
-    <textarea id="fbCfgInput" placeholder='{
-  "apiKey": "AIza...",
-  "authDomain": "your-app.firebaseapp.com",
-  "projectId": "your-app",
-  "storageBucket": "your-app.appspot.com",
-  "messagingSenderId": "...",
-  "appId": "..."
-}'></textarea>
+    <textarea id="fbCfgInput" placeholder='{ "apiKey": "..." }'></textarea>
     <div class="mactions">
       <button class="mcancel" onclick="closeSetupModal()">キャンセル</button>
       <button class="mok" onclick="saveFbCfg()">保存して接続</button>
@@ -474,8 +445,6 @@ canvas{display:none;}
 </div>
 
 <div class="main">
-
-  <!-- GALLERY -->
   <div id="gv" class="on">
     <div class="g-hdr">
       <h2>// SAVED WORKS</h2>
@@ -484,10 +453,8 @@ canvas{display:none;}
     <div id="gc"></div>
   </div>
 
-  <!-- EDITOR -->
   <div id="ev">
     <div class="pleft">
-
       <div class="psec">
         <div class="slabel">画像</div>
         <div class="dz" id="dz">
@@ -497,7 +464,6 @@ canvas{display:none;}
         <input type="file" id="fi" accept="image/*">
         <img id="prev" alt="preview">
       </div>
-
       <div class="psec">
         <div class="slabel">出力サイズ</div>
         <div class="sr">
@@ -506,7 +472,6 @@ canvas{display:none;}
           <span class="sv" id="wv">100</span>
         </div>
       </div>
-
       <div class="psec">
         <div class="slabel">文字セット</div>
         <select class="csel" id="cs">
@@ -521,7 +486,6 @@ canvas{display:none;}
         <input type="text" class="cinput" id="cc" placeholder="明→暗の順で文字を入力">
         <p class="chint" id="ch">全角・半角混在は自動調整されます</p>
       </div>
-
       <div class="psec">
         <div class="slabel">補正</div>
         <div class="sr">
@@ -535,7 +499,6 @@ canvas{display:none;}
           <span class="sv" id="brv">0</span>
         </div>
       </div>
-
       <div class="psec">
         <div class="slabel">オプション</div>
         <div class="tr"><span>カラー出力</span>
@@ -545,9 +508,7 @@ canvas{display:none;}
         <div class="tr"><span>全角に統一</span>
           <label class="tog"><input type="checkbox" id="fw"><div class="tog-t"></div></label></div>
       </div>
-
-    </div><!-- /pleft -->
-
+    </div>
     <div class="pright">
       <div class="obar">
         <span class="oinfo" id="oinfo">—</span>
@@ -571,9 +532,8 @@ canvas{display:none;}
         <pre id="aout"></pre>
       </div>
     </div>
-  </div><!-- /ev -->
-
-</div><!-- /main -->
+  </div>
+</div>
 
 <canvas id="cv"></canvas>
 <div class="toast" id="toast"></div>
@@ -598,8 +558,8 @@ function showTab(t) {
     document.getElementById(x+'v').classList.toggle('on', x===t);
     document.getElementById('t'+x).classList.toggle('on', x===t);
   });
-  document.getElementById('pnw').style.display    = t==='e' ? 'flex'  : 'none';
-  document.getElementById('sbtn').style.display   = t==='e' ? 'block' : 'none';
+  document.getElementById('pnw').style.display = t==='e' ? 'flex'  : 'none';
+  document.getElementById('sbtn').style.display = t==='e' ? 'block' : 'none';
   if (t==='g') renderGallery();
 }
 
@@ -607,19 +567,17 @@ function newProj() {
   projId = null; img = null; rawAscii = '';
   document.getElementById('pname').value = '';
   document.getElementById('prev').style.display = 'none';
-  document.getElementById('dz').style.display   = '';
-  document.getElementById('aout').textContent   = '';
-  document.getElementById('aout').innerHTML     = '';
-  document.getElementById('est').style.display  = 'flex';
-  document.getElementById('ld').style.display   = 'none';
-  document.getElementById('oinfo').textContent  = '—';
+  document.getElementById('dz').style.display = '';
+  document.getElementById('aout').textContent = '';
+  document.getElementById('est').style.display = 'flex';
+  document.getElementById('ld').style.display = 'none';
+  document.getElementById('oinfo').textContent = '—';
   showTab('e');
 }
 
 // ─── IMAGE ──────────────────────────────────
 const dz = document.getElementById('dz');
 const fi = document.getElementById('fi');
-
 dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('dov'); });
 dz.addEventListener('dragleave', () => dz.classList.remove('dov'));
 dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('dov'); loadFile(e.dataTransfer.files[0]); });
@@ -633,7 +591,8 @@ function loadFile(f) {
     i.onload = () => {
       img = i;
       const p = document.getElementById('prev');
-      p.src = ev.target.result; p.style.display = 'block';
+      p.src = ev.target.result;
+      p.style.display = 'block';
       dz.style.display = 'none';
       sched();
     };
@@ -642,19 +601,16 @@ function loadFile(f) {
   r.readAsDataURL(f);
 }
 
-// ─── CONTROLS → REALTIME ────────────────────
+// ─── CONTROLS ──────────────────────────────
 function bindS(id, vid, sfx) {
   const s = document.getElementById(id), v = document.getElementById(vid);
   s.addEventListener('input', () => { v.textContent = s.value + (sfx||''); sched(); });
 }
 bindS('ws','wv'); bindS('cns','cnv'); bindS('brs','brv');
-
 document.getElementById('fss').addEventListener('input', function() {
-  const v = +this.value;
-  document.getElementById('fsv').textContent = v+'px';
-  applyFontSize(v);
+  document.getElementById('fsv').textContent = this.value+'px';
+  applyFontSize(+this.value);
 });
-
 document.getElementById('cs').addEventListener('change', function() {
   const c = this.value==='custom';
   document.getElementById('cc').style.display = c?'block':'none';
@@ -664,146 +620,111 @@ document.getElementById('cs').addEventListener('change', function() {
 document.getElementById('cc').addEventListener('input', sched);
 ['ct','inv','fw'].forEach(id => document.getElementById(id).addEventListener('change', sched));
 
-function sched() {
-  if (!img) return;
-  clearTimeout(rtimer);
-  rtimer = setTimeout(render, 60);
-}
+function sched() { if (img) { clearTimeout(rtimer); rtimer = setTimeout(render, 60); } }
 
 function applyFontSize(v) {
   const o = document.getElementById('aout');
-  o.style.fontSize   = v+'px';
+  o.style.fontSize = v+'px';
   o.style.lineHeight = v<=6?'1.06':v<=10?'1.0':'0.95';
 }
 
-// ─── CHAR WIDTH ──────────────────────────────
-function cw(ch) {
-  const cp = ch.codePointAt(0);
-  if (
-    (cp>=0x1100&&cp<=0x115F)||(cp>=0x2E80&&cp<=0x303F)||
-    (cp>=0x3040&&cp<=0x33FF)||(cp>=0x3400&&cp<=0x4DBF)||
-    (cp>=0x4E00&&cp<=0xA4FF)||(cp>=0xAC00&&cp<=0xD7AF)||
-    (cp>=0xF900&&cp<=0xFAFF)||(cp>=0xFE10&&cp<=0xFE1F)||
-    (cp>=0xFE30&&cp<=0xFE6F)||(cp>=0xFF01&&cp<=0xFF60)||
-    (cp>=0xFFE0&&cp<=0xFFE6)||(cp>=0x20000&&cp<=0x2CEAF)
-  ) return 2;
-  return 1;
-}
-
-function normRow(chars, targetCols) {
-  let used = 0, res = '';
-  for (const ch of chars) {
-    const w = cw(ch);
-    if (used + w > targetCols) break;
-    res += ch; used += w;
+// ─── RENDER (エッジ検出 & コピー崩れ対策版) ───
+function applyEdgeDetection(data, w, h, strength) {
+  if (strength <= 0) return data;
+  const copy = new Uint8ClampedArray(data);
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const i = (y * w + x) * 4;
+      const val = data[i] * 5 - data[i - w * 4] - data[i + w * 4] - data[i - 4] - data[i + 4];
+      const res = val * (strength / 50); 
+      const final = data[i] + (res - data[i]) * 0.5;
+      copy[i] = copy[i + 1] = copy[i + 2] = Math.max(0, Math.min(255, final));
+    }
   }
-  while (used < targetCols) { res += ' '; used++; }
-  return res;
+  return copy;
 }
 
-// ─── RENDER ──────────────────────────────────
 function render() {
   if (!img) return;
   document.getElementById('est').style.display = 'none';
-  document.getElementById('ld').style.display  = 'flex';
-  document.getElementById('aout').textContent  = '';
-  document.getElementById('aout').innerHTML    = '';
-
-  requestAnimationFrame(() => requestAnimationFrame(() => {
+  document.getElementById('ld').style.display = 'flex';
+  
+  requestAnimationFrame(() => {
     const {plain, html} = buildAA();
     rawAscii = plain;
-
     document.getElementById('ld').style.display = 'none';
     const o = document.getElementById('aout');
-    const fs = +document.getElementById('fss').value;
-    applyFontSize(fs);
-
-    if (document.getElementById('ct').checked) {
-      o.innerHTML = html;
-    } else {
-      o.textContent = plain;
-    }
-
+    applyFontSize(+document.getElementById('fss').value);
+    if (document.getElementById('ct').checked) o.innerHTML = html;
+    else o.textContent = plain;
     const lines = plain.split('\n');
-    document.getElementById('oinfo').textContent =
-      `${(lines[0]||'').length} 文字 × ${lines.length} 行`;
-  }));
+    document.getElementById('oinfo').textContent = `${(lines[0]||'').length} 文字 × ${lines.length} 行`;
+  });
 }
 
 function buildAA() {
   const canvas = document.getElementById('cv');
-  const ctx    = canvas.getContext('2d');
-
-  const W      = +document.getElementById('ws').value;
-  const csKey  = document.getElementById('cs').value;
-  let rawC     = csKey==='custom'
-    ? (document.getElementById('cc').value || CS.standard)
-    : CS[csKey];
-
-  const inv   = document.getElementById('inv').checked;
+  const ctx = canvas.getContext('2d');
+  const W = +document.getElementById('ws').value;
+  const csKey = document.getElementById('cs').value;
+  let rawC = csKey==='custom' ? (document.getElementById('cc').value || CS.standard) : CS[csKey];
+  const inv = document.getElementById('inv').checked;
   const color = document.getElementById('ct').checked;
-  const fwOn  = document.getElementById('fw').checked;
+  const fwOn = document.getElementById('fw').checked;
   const ctrst = +document.getElementById('cns').value;
-  const brt   = +document.getElementById('brs').value;
+  const brt = +document.getElementById('brs').value;
 
   if (inv) rawC = [...rawC].reverse().join('');
   const ca = [...rawC];
 
-  // Detect width mixture
-  const hasFull = ca.some(c => cw(c)===2);
-  const hasHalf = ca.some(c => cw(c)===1);
-  const mixed   = hasFull && hasHalf;
+  const hratio = 0.5; 
+  const ar = img.height / img.width;
+  const pxW = W;
+  const pxH = Math.max(1, Math.round(W * ar * hratio));
 
-  // If all full-width: use half the pixel columns (each char = 2 cols)
-  const cellCols = (hasFull && !mixed && !fwOn) ? 2 : 1;
-  const pxW      = hasFull && !mixed && !fwOn ? Math.ceil(W/2) : W;
-  const tgtCols  = pxW * cellCols;
-
-  const ar  = img.height / img.width;
-  const hratio = cellCols===2 ? 0.88 : 0.44;
-  const pxH = Math.max(1, Math.round(pxW * ar * hratio));
-
-  canvas.width  = pxW;
+  canvas.width = pxW;
   canvas.height = pxH;
-  ctx.filter    = `contrast(${100+ctrst}%) brightness(${100+brt}%)`;
+  ctx.filter = `contrast(${100+ctrst}%) brightness(${100+brt}%) grayscale(100%)`;
   ctx.drawImage(img, 0, 0, pxW, pxH);
-  ctx.filter    = 'none';
+  ctx.filter = 'none';
 
-  const d = ctx.getImageData(0, 0, pxW, pxH).data;
+  const imageData = ctx.getImageData(0, 0, pxW, pxH);
+  const processedData = applyEdgeDetection(imageData.data, pxW, pxH, 40);
+
   const pl = [], hl = [];
-
   for (let y = 0; y < pxH; y++) {
     let pr = '', hr = '';
     for (let x = 0; x < pxW; x++) {
-      const i   = (y*pxW+x)*4;
-      const r=d[i], g=d[i+1], b=d[i+2];
-      const lum = 0.299*r+0.587*g+0.114*b;
+      const i = (y * pxW + x) * 4;
+      const lum = processedData[i]; 
       let ch = ca[Math.round((lum/255)*(ca.length-1))];
 
-      // Convert half→full if fwOn
-      if (fwOn && cw(ch)===1) {
+      if (fwOn || csKey === 'dots' || csKey === 'katakana') {
         const cp = ch.codePointAt(0);
-        if (cp>=0x21&&cp<=0x7E) ch = String.fromCodePoint(cp+0xFEE0);
-        else if (cp===0x20) ch = '　';
+        if (cp >= 0x21 && cp <= 0x7E) ch = String.fromCodePoint(cp + 0xFEE0);
+        else if (ch === ' ') ch = '　';
       }
-
       pr += ch;
-      if (color) hr += `<span style="color:rgb(${r},${g},${b})">${ch}</span>`;
+      if (color) {
+        const r = imageData.data[i], g = imageData.data[i+1], b = imageData.data[i+2];
+        hr += `<span style="color:rgb(${r},${g},${b})">${ch}</span>`;
+      }
     }
-
-    // Normalise mixed-width rows
-    if (mixed && !fwOn) pr = normRow([...pr], tgtCols);
-
     pl.push(pr);
     if (color) hl.push(hr);
   }
-
   return { plain: pl.join('\n'), html: hl.join('\n') };
 }
 
 // ─── COPY / DOWNLOAD ─────────────────────────
 function copyA() {
   if (!rawAscii) return;
+  if (!navigator.clipboard) {
+    const ta = document.createElement("textarea");
+    ta.value = rawAscii; document.body.appendChild(ta); ta.select();
+    document.execCommand("copy"); document.body.removeChild(ta);
+    toast('✓ コピーしました'); return;
+  }
   navigator.clipboard.writeText(rawAscii).then(() => toast('✓ コピーしました'));
 }
 function dlTxt() {
@@ -819,8 +740,12 @@ const KEY = 'aa_gen_v2';
 const load = () => { try { return JSON.parse(localStorage.getItem(KEY))||[]; } catch { return []; } };
 const save = ps => localStorage.setItem(KEY, JSON.stringify(ps));
 
-function getSettings() {
-  return {
+function saveProj() {
+  if (!rawAscii) { toast('⚠ 先に画像をアップロードしてください'); return; }
+  const name = document.getElementById('pname').value.trim()||'無題のAA';
+  const ps = load();
+  const prev = rawAscii.split('\n').slice(0, 50).join('\n');
+  const s = {
     ws:+document.getElementById('ws').value,
     cs:document.getElementById('cs').value,
     cc:document.getElementById('cc').value,
@@ -831,30 +756,6 @@ function getSettings() {
     fw:document.getElementById('fw').checked,
     fs:+document.getElementById('fss').value,
   };
-}
-
-function applySettings(s) {
-  if (!s) return;
-  const set = (id, v) => { const el = document.getElementById(id); if(el) el.value = v; };
-  const setc = (id, v) => { const el = document.getElementById(id); if(el) el.checked = v; };
-  set('ws', s.ws??100); document.getElementById('wv').textContent = s.ws??100;
-  set('cs', s.cs??'standard');
-  set('cc', s.cc??'');
-  set('cns', s.cns??0); document.getElementById('cnv').textContent = s.cns??0;
-  set('brs', s.brs??0); document.getElementById('brv').textContent = s.brs??0;
-  setc('ct', !!s.ct); setc('inv', !!s.inv); setc('fw', !!s.fw);
-  set('fss', s.fs??8); document.getElementById('fsv').textContent = (s.fs??8)+'px';
-  const isC = s.cs==='custom';
-  document.getElementById('cc').style.display = isC?'block':'none';
-  document.getElementById('ch').style.display = isC?'block':'none';
-}
-
-function saveProj() {
-  if (!rawAscii) { toast('⚠ 先に画像をアップロードしてください'); return; }
-  const name = document.getElementById('pname').value.trim()||'無題のAA';
-  const ps   = load();
-  const prev = rawAscii.split('\n').slice(0, 50).join('\n');
-  const s    = getSettings();
   if (projId) {
     const idx = ps.findIndex(p=>p.id===projId);
     if (idx>=0) ps[idx] = {...ps[idx], name, s, prev, u:Date.now()};
@@ -863,125 +764,73 @@ function saveProj() {
     ps.unshift({id:projId, name, s, prev, c:Date.now(), u:Date.now()});
   }
   save(ps);
-  document.getElementById('pname').value = name;
   toast('💾 保存しました：'+name);
 }
 
 function openProj(p) {
   projId = p.id;
   document.getElementById('pname').value = p.name;
-  applySettings(p.s);
+  const s = p.s || {};
+  document.getElementById('ws').value = s.ws||100;
+  document.getElementById('wv').textContent = s.ws||100;
+  document.getElementById('cs').value = s.cs||'standard';
+  document.getElementById('cns').value = s.cns||0;
+  document.getElementById('brs').value = s.brs||0;
+  document.getElementById('ct').checked = !!s.ct;
+  document.getElementById('inv').checked = !!s.inv;
+  document.getElementById('fw').checked = !!s.fw;
+  document.getElementById('fss').value = s.fs||8;
+  document.getElementById('fsv').textContent = (s.fs||8)+'px';
   img = null; rawAscii = p.prev||'';
   document.getElementById('prev').style.display = 'none';
-  document.getElementById('dz').style.display   = '';
-  document.getElementById('est').style.display  = 'none';
-  document.getElementById('ld').style.display   = 'none';
+  document.getElementById('dz').style.display = '';
+  document.getElementById('est').style.display = 'none';
+  document.getElementById('ld').style.display = 'none';
   const o = document.getElementById('aout');
-  applyFontSize(p.s?.fs??8);
+  applyFontSize(s.fs||8);
   o.textContent = rawAscii;
-  const lines = rawAscii.split('\n');
-  document.getElementById('oinfo').textContent =
-    `${(lines[0]||'').length} 文字 × ${lines.length} 行（保存済）`;
   showTab('e');
 }
 
-function delProj(id, e) {
-  e.stopPropagation();
-  save(load().filter(p=>p.id!==id));
-  renderGallery();
-  toast('🗑 削除しました');
-}
+function delProj(id, e) { e.stopPropagation(); save(load().filter(p=>p.id!==id)); renderGallery(); toast('🗑 削除しました'); }
 
 function renderGallery() {
   const ps = load();
   const gc = document.getElementById('gc');
-
   if (!ps.length) {
-    gc.innerHTML = '';
-    gc.className = '';
-    const d = document.createElement('div');
-    d.className = 'g-empty';
-    d.innerHTML = '<div class="eg">░▒▓█</div><p>保存された作品がありません<br>エディターで作成して保存してください</p>';
-    gc.appendChild(d);
-    gc.style.cssText = 'display:flex;flex:1;';
+    gc.innerHTML = '<div class="g-empty"><div class="eg">░▒▓█</div><p>作品がありません</p></div>';
     return;
   }
-
-  gc.style.cssText = '';
   gc.className = 'g-grid';
-
   gc.innerHTML = ps.map(p => {
-    const dt = new Date(p.u||p.c).toLocaleDateString('ja-JP');
     const esc = (p.prev||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    const pd  = encodeURIComponent(JSON.stringify(p));
-    return `
-<div class="card" onclick="openProj(JSON.parse(decodeURIComponent('${pd}')))">
-  <div class="card-prev">${esc}</div>
-  <div class="card-info">
-    <div class="card-name">${p.name.replace(/</g,'&lt;')}</div>
-    <div class="card-meta">${dt}</div>
-  </div>
-  <div class="card-del" onclick="delProj('${p.id}',event)">✕</div>
-</div>`;
+    return `<div class="card" onclick='openProj(${JSON.stringify(p)})'>
+      <div class="card-prev">${esc}</div>
+      <div class="card-info"><div class="card-name">${p.name}</div></div>
+      <div class="card-del" onclick="delProj('${p.id}',event)">✕</div>
+    </div>`;
   }).join('');
 }
 
-// ─── TOAST ───────────────────────────────────
-let tt;
 function toast(msg) {
   const t = document.getElementById('toast');
   t.textContent = msg; t.classList.add('show');
-  clearTimeout(tt); tt = setTimeout(()=>t.classList.remove('show'), 2200);
+  setTimeout(()=>t.classList.remove('show'), 2200);
 }
 
-// ─── FIREBASE SETUP MODAL ────────────────────
-function showSetupModal() {
-  const raw = localStorage.getItem('aa_fb_cfg');
-  const st  = document.getElementById('cfgStatus');
-  if (raw) {
-    try {
-      JSON.parse(raw);
-      st.className = 'cfg-st cfg-ok';
-      st.textContent = '✓ 設定済み（接続中）';
-      document.getElementById('fbCfgInput').value = JSON.stringify(JSON.parse(raw), null, 2);
-    } catch { st.className='cfg-st cfg-no'; st.textContent='⚠ 設定が無効です'; }
-  } else {
-    st.className = 'cfg-st cfg-no';
-    st.textContent = '未設定';
-    document.getElementById('fbCfgInput').value = '';
-  }
-  document.getElementById('setupModal').classList.add('open');
-}
-
-function closeSetupModal() {
-  document.getElementById('setupModal').classList.remove('open');
-}
-// Firebase設定（isasuke139さんのプロジェクト専用）
+// ─── FIREBASE CONFIG ────────────────────────
 const firebaseConfig = {
   apiKey: "AIzaSyBO6zoUHt2TteX22WKFXaxC0wAzh8lEgtQ",
   authDomain: "aa--generator.firebaseapp.com",
   projectId: "aa--generator",
   storageBucket: "aa--generator.firebasestorage.app",
   messagingSenderId: "400807317542",
-  appId: "1:400807317542:web:85905aa007f22aa97a96e7",
-  measurementId: "G-QTS2JNGGK1"
+  appId: "1:400807317542:web:85905aa007f22aa97a96e7"
 };
 
-// ページ読み込み時に自動でFirebaseを初期化
-if (!firebase.apps.length) {
-  firebase.initializeApp(firebaseConfig);
-  console.log("🔥 Firebase connected automatically!");
-}
-
-// 設定ボタン用の関数は空にしておく（今の設定を上書きさせないため）
-function saveFbCfg() {
-  closeSetupModal();
-}
-
-// Close modal on backdrop click
-document.getElementById('setupModal').addEventListener('click', function(e) {
-  if (e.target === this) closeSetupModal();
-});
+function showSetupModal() { document.getElementById('setupModal').classList.add('open'); }
+function closeSetupModal() { document.getElementById('setupModal').classList.remove('open'); }
+function saveFbCfg() { closeSetupModal(); }
 
 // ─── INIT ────────────────────────────────────
 renderGallery();
