@@ -3,275 +3,988 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AA_GEN — Ultimate Studio</title>
+<title>AA_GEN — ASCII Art Generator</title>
 <script type="module">
   import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-  import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
-  import { getFirestore, collection, addDoc, query, where, getDocs, serverTimestamp, orderBy } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+  import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
+    from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 
-  // --- Firebase Config (isasuke139専用) ---
-  const firebaseConfig = {
-    apiKey: "AIzaSyBO6zoUHt2TteX22WKFXaxC0wAzh8lEgtQ",
-    authDomain: "aa--generator.firebaseapp.com",
-    projectId: "aa--generator",
-    storageBucket: "aa--generator.firebasestorage.app",
-    messagingSenderId: "400807317542",
-    appId: "1:400807317542:web:85905aa007f22aa97a96e7"
-  };
+  window._fbReady = false;
 
-  const app = initializeApp(firebaseConfig);
-  const auth = getAuth(app);
-  const db = getFirestore(app);
+function tryInit() {
+  try {
+    const app  = initializeApp(firebaseConfig); 
+    const auth = getAuth(app);
+    
+    window._auth = auth;
+    window._fbReady = true;
 
-  window._fb = { auth, db, user: null };
-
-  onAuthStateChanged(auth, user => {
-    window._fb.user = user;
-    const btn = document.getElementById('authBtn');
-    const uInfo = document.getElementById('uInfo');
-    btn.textContent = user ? 'ログアウト' : 'Googleログイン';
-    if (user) {
-      uInfo.innerHTML = `<img src="${user.photoURL}" style="width:28px;border-radius:50%;border:1px solid var(--acc)"><span>${user.displayName}</span>`;
-      loadGallery();
-    } else {
-      uInfo.innerHTML = '';
-    }
-  });
-
-  window.handleAuth = () => window._fb.user ? signOut(auth) : signInWithPopup(auth, new GoogleAuthProvider());
-
-  window.saveArt = async () => {
-    if (!window._fb.user) return alert("ログインが必要です");
-    const name = prompt("作品タイトルを入力", "劇画作品 " + new Date().toLocaleTimeString());
-    if (!name) return;
-    try {
-      await addDoc(collection(db, "projects"), {
-        uid: window._fb.user.uid,
-        name: name,
-        ascii: document.getElementById('aout').textContent,
-        createdAt: serverTimestamp()
-      });
-      alert("クラウドに保存しました");
-      loadGallery();
-    } catch (e) { alert("エラー: " + e.message); }
-  };
-
-  async function loadGallery() {
-    const grid = document.getElementById('galleryGrid');
-    grid.innerHTML = '<div style="color:var(--dim)">読み込み中...</div>';
-    const q = query(collection(db, "projects"), where("uid", "==", window._fb.user.uid), orderBy("createdAt", "desc"));
-    const snap = await getDocs(q);
-    grid.innerHTML = '';
-    snap.forEach(doc => {
-      const p = doc.data();
-      const div = document.createElement('div');
-      div.className = 'g-card';
-      div.innerHTML = `<div class="g-thumb"><pre>${p.ascii.substring(0, 100)}</pre></div><div class="g-title">${p.name}</div>`;
-      div.onclick = () => { document.getElementById('aout').textContent = p.ascii; switchTab('editor'); };
-      grid.appendChild(div);
+    onAuthStateChanged(auth, user => {
+      window._user = user || null;
+      updateAuthUI(user);
     });
+
+  } catch (e) {
+    console.error("Firebaseの接続に失敗しました:", e);
   }
+} 
+
+  window.googleSignIn = async () => {
+    if (!window._fbReady) { showSetupModal(); return; }
+    try {
+      const provider = new GoogleAuthProvider();
+      await signInWithPopup(window._auth, provider);
+    } catch(e) { console.error(e); }
+  };
+
+  window.googleSignOut = async () => {
+    if (!window._fbReady) return;
+    await signOut(window._auth);
+  };
+
+  function updateAuthUI(user) {
+    const btn  = document.getElementById('authBtn');
+    const info = document.getElementById('userInfo');
+    if (!btn) return;
+    if (user) {
+      btn.textContent = 'ログアウト';
+      btn.onclick = window.googleSignOut;
+      info.innerHTML = `<img src="${user.photoURL||''}" style="width:22px;height:22px;border-radius:50%;vertical-align:middle;margin-right:6px;">${user.displayName||user.email}`;
+      info.style.display = 'flex';
+    } else {
+      btn.textContent = 'Googleでログイン';
+      btn.onclick = window.googleSignIn;
+      info.style.display = 'none';
+    }
+  }
+
+  tryInit();
+  window._tryInitFB = tryInit;
 </script>
 <style>
-  :root {
-    --bg: #06060a; --s1: #0e0e16; --s2: #161624; --acc: #7affb2; --dim: #606080;
-    --text: #e0e0f0; --border: #202035; --grad: linear-gradient(135deg, #7affb2, #56ccf2);
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: var(--bg); color: var(--text); font-family: sans-serif; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Zen+Kaku+Gothic+New:wght@300;400;700&display=swap');
 
-  header { height: 60px; background: var(--s1); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 25px; gap: 20px; z-index: 100; }
-  .logo { font-weight: 800; font-size: 18px; color: var(--acc); letter-spacing: 1px; }
-  .tabs { display: flex; background: #000; padding: 4px; border-radius: 10px; border: 1px solid var(--border); }
-  .tab { border: none; background: none; color: var(--dim); padding: 8px 18px; border-radius: 7px; cursor: pointer; font-weight: bold; font-size: 12px; }
-  .tab.active { background: var(--s2); color: var(--acc); }
+:root {
+  --bg:      #08080d;
+  --s1:      #0f0f18;
+  --s2:      #161622;
+  --border:  #252535;
+  --border2: #353550;
+  --acc:     #7affb2;
+  --acc2:    #ff6b6b;
+  --acc3:    #6b9fff;
+  --text:    #dde0f0;
+  --dim:     #5a5a80;
+  --dim2:    #8888aa;
+  --mono:    'Space Mono', monospace;
+  --ui:      'Zen Kaku Gothic New', sans-serif;
+}
 
-  .container { flex: 1; display: flex; overflow: hidden; position: relative; }
-  .view { position: absolute; inset: 0; opacity: 0; pointer-events: none; display: flex; }
-  .view.active { opacity: 1; pointer-events: auto; }
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--text);font-family:var(--ui);display:flex;flex-direction:column;}
 
-  /* サイドバー */
-  .sidebar { width: 320px; background: var(--s1); border-right: 1px solid var(--border); overflow-y: auto; padding: 25px; display: flex; flex-direction: column; gap: 25px; }
-  .sec-title { font-size: 10px; font-weight: 800; color: var(--dim); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 15px; display: block; }
-  
-  .drop { border: 2px dashed var(--border); border-radius: 12px; padding: 30px 10px; text-align: center; color: var(--dim); cursor: pointer; transition: 0.3s; font-size: 12px; }
-  .drop:hover { border-color: var(--acc); color: var(--text); }
-  #prevImg { width: 100%; border-radius: 8px; margin-top: 15px; display: none; border: 1px solid var(--border); }
+body::before{
+  content:'';position:fixed;inset:0;
+  background-image:
+    linear-gradient(rgba(122,255,178,.025) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(122,255,178,.025) 1px,transparent 1px);
+  background-size:36px 36px;
+  pointer-events:none;z-index:0;
+}
 
-  .ctrl-item { margin-bottom: 10px; }
-  .ctrl-head { display: flex; justify-content: space-between; font-size: 11px; font-weight: bold; margin-bottom: 8px; }
-  .ctrl-val { color: var(--acc); }
-  input[type=range] { width: 100%; height: 6px; background: #000; border-radius: 3px; appearance: none; outline: none; accent-color: var(--acc); }
+/* ── HEADER ── */
+header{
+  position:relative;z-index:10;
+  display:flex;align-items:center;gap:16px;
+  padding:0 20px;height:52px;
+  border-bottom:1px solid var(--border);
+  background:var(--s1);flex-shrink:0;
+}
+.logo{
+  font-family:var(--mono);font-size:15px;
+  color:var(--acc);text-shadow:0 0 14px rgba(122,255,178,.5);
+  letter-spacing:-1px;white-space:nowrap;
+}
+.logo em{color:var(--dim2);font-style:italic;font-size:11px;margin-left:6px;}
 
-  /* メイン出力 */
-  .stage { flex: 1; background: #000; display: flex; flex-direction: column; overflow: hidden; }
-  .stage-bar { height: 45px; background: var(--s1); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 20px; justify-content: space-between; font-size: 11px; color: var(--dim); }
-  .stage-content { flex: 1; overflow: auto; padding: 30px; display: flex; align-items: flex-start; justify-content: center; }
-  #aout { font-family: 'Courier New', monospace; font-size: 9px; line-height: 0.82; white-space: pre; color: #fff; letter-spacing: -1.2px; }
+.tabs{
+  display:flex;gap:2px;
+  background:var(--bg);border:1px solid var(--border);
+  border-radius:7px;padding:3px;
+}
+.tab{
+  background:none;border:none;
+  color:var(--dim2);font-family:var(--mono);font-size:11px;
+  padding:5px 14px;border-radius:5px;cursor:pointer;
+  transition:all .15s;white-space:nowrap;
+}
+.tab.on{background:var(--s2);color:var(--text);}
+.tab:hover:not(.on){color:var(--text);}
 
-  /* ギャラリー */
-  #view-gallery { padding: 40px; display: block; overflow-y: auto; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; }
-  .g-card { background: var(--s1); border: 1px solid var(--border); border-radius: 15px; padding: 15px; cursor: pointer; transition: 0.3s; }
-  .g-card:hover { border-color: var(--acc); transform: translateY(-3px); }
-  .g-thumb { height: 100px; background: #000; overflow: hidden; font-size: 2px; line-height: 1; color: #444; border-radius: 8px; margin-bottom: 10px; }
-  .g-title { font-weight: bold; font-size: 14px; }
+.hspc{flex:1;}
 
-  .btn { border: none; padding: 10px 18px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 12px; transition: 0.2s; }
-  .btn-p { background: var(--grad); color: #000; width: 100%; }
+.pname-wrap{
+  display:none;align-items:center;gap:8px;
+  background:var(--bg);border:1px solid var(--border);
+  border-radius:6px;padding:4px 12px;
+}
+.pname-wrap label{font-size:10px;color:var(--dim);font-family:var(--mono);}
+#pname{
+  background:none;border:none;color:var(--text);
+  font-family:var(--mono);font-size:12px;width:150px;outline:none;
+}
+#pname::placeholder{color:var(--dim);}
+
+.savebtn{
+  display:none;
+  background:var(--acc);color:#000;border:none;
+  font-family:var(--mono);font-size:11px;font-weight:700;
+  padding:7px 16px;border-radius:6px;cursor:pointer;
+  transition:all .15s;white-space:nowrap;
+  box-shadow:0 0 12px rgba(122,255,178,.3);
+}
+.savebtn:hover{background:#9effcc;box-shadow:0 0 20px rgba(122,255,178,.5);}
+
+/* ── AUTH ── */
+.auth-area{display:flex;align-items:center;gap:10px;}
+#userInfo{
+  display:none;align-items:center;
+  font-family:var(--mono);font-size:11px;color:var(--dim2);
+  max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+#authBtn{
+  background:none;
+  border:1px solid var(--border2);color:var(--dim2);
+  font-family:var(--mono);font-size:11px;
+  padding:6px 13px;border-radius:6px;cursor:pointer;
+  transition:all .15s;white-space:nowrap;
+}
+#authBtn:hover{border-color:var(--acc3);color:var(--acc3);}
+.setup-link{
+  font-family:var(--mono);font-size:10px;color:var(--dim);
+  cursor:pointer;text-decoration:underline;text-underline-offset:2px;
+  transition:color .15s;white-space:nowrap;
+}
+.setup-link:hover{color:var(--dim2);}
+
+/* ── MODAL ── */
+.modal-bg{
+  display:none;position:fixed;inset:0;
+  background:rgba(0,0,0,.78);backdrop-filter:blur(4px);
+  z-index:200;align-items:center;justify-content:center;
+}
+.modal-bg.open{display:flex;}
+.modal{
+  background:var(--s1);border:1px solid var(--border2);
+  border-radius:14px;padding:30px 28px;width:min(500px,92vw);
+  position:relative;
+}
+.modal h3{font-family:var(--mono);font-size:14px;color:var(--acc);margin-bottom:6px;}
+.modal .msub{font-size:12px;color:var(--dim2);margin-bottom:20px;line-height:1.75;}
+.modal .msub a{color:var(--acc3);text-decoration:none;}
+.modal .msub a:hover{text-decoration:underline;}
+.modal label{font-size:11px;color:var(--dim2);font-family:var(--mono);display:block;margin-bottom:4px;margin-top:12px;}
+.modal input,.modal textarea{
+  width:100%;background:var(--bg);border:1px solid var(--border);
+  border-radius:6px;color:var(--text);font-family:var(--mono);font-size:12px;
+  padding:8px 11px;outline:none;transition:border-color .15s;
+}
+.modal input:focus,.modal textarea:focus{border-color:var(--acc3);}
+.modal textarea{height:100px;resize:vertical;font-size:11px;}
+.mactions{display:flex;gap:8px;margin-top:20px;justify-content:flex-end;}
+.mok{
+  background:var(--acc3);color:#000;border:none;
+  font-family:var(--mono);font-size:12px;font-weight:700;
+  padding:8px 20px;border-radius:6px;cursor:pointer;transition:all .15s;
+}
+.mok:hover{background:#88b8ff;}
+.mcancel{
+  background:none;border:1px solid var(--border);color:var(--dim2);
+  font-family:var(--mono);font-size:12px;
+  padding:8px 16px;border-radius:6px;cursor:pointer;transition:all .15s;
+}
+.mcancel:hover{border-color:var(--border2);color:var(--text);}
+.mclose{
+  position:absolute;top:13px;right:15px;
+  background:none;border:none;color:var(--dim);font-size:18px;cursor:pointer;
+  transition:color .15s;line-height:1;
+}
+.mclose:hover{color:var(--text);}
+.cfg-st{font-family:var(--mono);font-size:11px;margin-top:8px;}
+.cfg-ok{color:var(--acc);}
+.cfg-no{color:var(--dim2);}
+
+/* ── MAIN ── */
+.main{position:relative;z-index:1;display:flex;flex:1;overflow:hidden;}
+
+/* ── GALLERY ── */
+#gv{display:none;flex-direction:column;flex:1;overflow:hidden;background:var(--bg);}
+#gv.on{display:flex;}
+.g-hdr{
+  padding:20px 28px 14px;
+  display:flex;align-items:center;justify-content:space-between;
+  border-bottom:1px solid var(--border);flex-shrink:0;
+}
+.g-hdr h2{font-family:var(--mono);font-size:13px;color:var(--dim2);letter-spacing:2px;}
+.btn-new{
+  background:none;border:1px solid var(--acc);color:var(--acc);
+  font-family:var(--mono);font-size:11px;
+  padding:6px 16px;border-radius:6px;cursor:pointer;transition:all .15s;
+}
+.btn-new:hover{background:var(--acc);color:#000;}
+
+.g-grid{
+  flex:1;overflow-y:auto;padding:20px 28px;
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));
+  gap:14px;align-content:start;
+}
+.g-empty{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  flex:1;gap:12px;color:var(--dim);
+  font-family:var(--mono);font-size:12px;text-align:center;
+}
+.g-empty .eg{font-size:44px;opacity:.18;line-height:1;}
+
+.card{
+  background:var(--s1);border:1px solid var(--border);
+  border-radius:10px;overflow:hidden;cursor:pointer;
+  transition:all .2s;position:relative;
+}
+.card:hover{border-color:var(--border2);transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.5);}
+.card-prev{
+  background:var(--bg);padding:10px;height:110px;overflow:hidden;
+  font-family:var(--mono);font-size:2.5px;line-height:1.0;white-space:pre;
+  color:var(--text);user-select:none;
+}
+.card-info{padding:9px 12px;border-top:1px solid var(--border);}
+.card-name{font-size:13px;font-weight:700;margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.card-meta{font-family:var(--mono);font-size:10px;color:var(--dim);}
+.card-del{
+  position:absolute;top:5px;right:5px;
+  background:rgba(255,107,107,.12);border:1px solid rgba(255,107,107,.25);
+  color:var(--acc2);border-radius:4px;width:22px;height:22px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;cursor:pointer;opacity:0;transition:opacity .15s;
+}
+.card:hover .card-del{opacity:1;}
+
+/* ── EDITOR ── */
+#ev{display:none;flex:1;overflow:hidden;}
+#ev.on{display:flex;}
+
+.pleft{
+  width:288px;flex-shrink:0;
+  background:var(--s1);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;overflow-y:auto;
+}
+.psec{padding:16px 18px;border-bottom:1px solid var(--border);}
+.psec:last-child{border-bottom:none;}
+
+.slabel{
+  font-family:var(--mono);font-size:9px;letter-spacing:3px;color:var(--dim);
+  text-transform:uppercase;margin-bottom:12px;
+  display:flex;align-items:center;gap:8px;
+}
+.slabel::after{content:'';flex:1;height:1px;background:var(--border);}
+
+/* drop */
+.dz{
+  border:2px dashed var(--border2);border-radius:8px;
+  padding:22px 10px;text-align:center;cursor:pointer;
+  transition:all .2s;
+}
+.dz:hover,.dz.dov{border-color:var(--acc);box-shadow:0 0 14px rgba(122,255,178,.1);}
+.dz-icon{font-size:26px;display:block;margin-bottom:8px;}
+.dz p{font-size:12px;color:var(--dim2);line-height:1.7;}
+.dz strong{color:var(--acc);cursor:pointer;}
+#fi{display:none;}
+#prev{width:100%;border-radius:6px;display:none;border:1px solid var(--border);margin-top:10px;}
+
+/* sliders */
+.sr{display:flex;align-items:center;gap:8px;margin-bottom:9px;}
+.sr:last-child{margin-bottom:0;}
+.sr label{font-size:11px;color:var(--dim2);min-width:68px;}
+.sr input[type=range]{
+  flex:1;-webkit-appearance:none;height:3px;
+  background:var(--border2);border-radius:2px;outline:none;cursor:pointer;
+}
+.sr input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:12px;height:12px;border-radius:50%;
+  background:var(--acc);box-shadow:0 0 7px rgba(122,255,178,.6);cursor:pointer;
+}
+.sv{font-family:var(--mono);font-size:11px;color:var(--acc);width:32px;text-align:right;flex-shrink:0;}
+
+/* select */
+.csel{
+  width:100%;background:var(--bg);border:1px solid var(--border);
+  border-radius:6px;color:var(--text);
+  font-family:var(--mono);font-size:12px;
+  padding:7px 10px;cursor:pointer;outline:none;transition:border-color .15s;
+}
+.csel:hover,.csel:focus{border-color:var(--border2);}
+.cinput{
+  display:none;margin-top:7px;width:100%;background:var(--bg);
+  border:1px solid var(--border);border-radius:6px;
+  color:var(--text);font-family:var(--mono);font-size:12px;
+  padding:7px 10px;outline:none;transition:border-color .15s;
+}
+.cinput:focus{border-color:var(--acc);}
+.chint{font-size:10px;color:var(--dim);margin-top:5px;line-height:1.5;display:none;}
+
+/* toggle */
+.tr{display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--dim2);margin-bottom:9px;}
+.tr:last-child{margin-bottom:0;}
+.tog{position:relative;width:32px;height:17px;}
+.tog input{display:none;}
+.tog-t{
+  position:absolute;inset:0;background:var(--border2);
+  border-radius:9px;cursor:pointer;transition:background .2s;
+}
+.tog input:checked+.tog-t{background:var(--acc);}
+.tog-t::after{
+  content:'';position:absolute;top:2px;left:2px;
+  width:13px;height:13px;background:#fff;border-radius:50%;transition:transform .2s;
+}
+.tog input:checked+.tog-t::after{transform:translateX(15px);}
+
+/* right */
+.pright{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--bg);}
+
+.obar{
+  padding:9px 18px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:9px;flex-shrink:0;background:var(--s1);
+}
+.oinfo{font-family:var(--mono);font-size:11px;color:var(--dim);flex:1;}
+.obtn{
+  background:var(--s2);border:1px solid var(--border);color:var(--dim2);
+  font-family:var(--mono);font-size:11px;
+  padding:5px 11px;border-radius:5px;cursor:pointer;transition:all .15s;white-space:nowrap;
+}
+.obtn:hover{border-color:var(--border2);color:var(--text);}
+
+.fsr{
+  display:flex;align-items:center;gap:9px;padding:8px 18px;
+  border-bottom:1px solid var(--border);background:var(--s1);flex-shrink:0;
+}
+.fsr label{font-size:11px;color:var(--dim);font-family:var(--mono);white-space:nowrap;}
+.fsr input[type=range]{
+  flex:1;-webkit-appearance:none;height:3px;
+  background:var(--border2);border-radius:2px;outline:none;cursor:pointer;
+}
+.fsr input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:12px;height:12px;border-radius:50%;
+  background:var(--acc3);box-shadow:0 0 7px rgba(107,159,255,.6);cursor:pointer;
+}
+.fsr .sv{color:var(--acc3);}
+
+.oscroll{flex:1;overflow:auto;padding:18px;}
+
+.estate{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  height:100%;gap:12px;color:var(--dim);
+  font-family:var(--mono);font-size:12px;text-align:center;
+}
+.estate .ec{font-size:44px;opacity:.14;line-height:1;letter-spacing:-4px;}
+
+.ldng{
+  display:none;flex-direction:column;align-items:center;justify-content:center;
+  height:100%;gap:12px;color:var(--acc);font-family:var(--mono);font-size:12px;
+}
+.dots{display:flex;gap:5px;}
+.dots span{
+  width:6px;height:6px;border-radius:50%;background:var(--acc);
+  animation:bk 1s ease-in-out infinite;
+}
+.dots span:nth-child(2){animation-delay:.15s;}
+.dots span:nth-child(3){animation-delay:.3s;}
+@keyframes bk{0%,80%,100%{opacity:.2;transform:scale(.8);}40%{opacity:1;transform:scale(1);}}
+
+#aout{font-family:var(--mono);white-space:pre;display:inline-block;color:var(--text);}
+
+canvas{display:none;}
+
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+
+.toast{
+  position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(8px);
+  background:var(--s2);border:1px solid var(--border2);
+  color:var(--text);font-family:var(--mono);font-size:12px;
+  padding:9px 18px;border-radius:8px;
+  opacity:0;transition:all .22s;pointer-events:none;z-index:1000;white-space:nowrap;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 </style>
 </head>
 <body>
 
 <header>
-  <div class="logo">AA_GEN // STUDIO</div>
+  <div class="logo">// AA_GEN <em>v2</em></div>
+
   <div class="tabs">
-    <button class="tab active" id="tab-gallery" onclick="switchTab('gallery')">コレクション</button>
-    <button class="tab" id="tab-editor" onclick="switchTab('editor')">エディター</button>
+    <button class="tab on" id="tg" onclick="showTab('g')">📁 ギャラリー</button>
+    <button class="tab"    id="te" onclick="showTab('e')">✏️ エディター</button>
   </div>
-  <div style="flex:1"></div>
-  <div id="uInfo" style="display:flex; align-items:center; gap:10px; font-size:12px; font-weight:bold; color:var(--dim);"></div>
-  <button id="authBtn" class="tab" style="border:1px solid var(--border); color:var(--text)" onclick="handleAuth()">ログイン</button>
+
+  <div class="hspc"></div>
+
+  <div class="pname-wrap" id="pnw">
+    <label>名前：</label>
+    <input id="pname" placeholder="無題のAA" maxlength="40">
+  </div>
+
+  <button class="savebtn" id="sbtn" onclick="saveProj()">💾 保存</button>
+
+  <div class="auth-area">
+    <span id="userInfo"></span>
+    <button id="authBtn" onclick="window.googleSignIn ? window.googleSignIn() : showSetupModal()">Googleでログイン</button>
+    <span class="setup-link" onclick="showSetupModal()">⚙ Firebase設定</span>
+  </div>
 </header>
 
-<div class="container">
-  <div id="view-gallery" class="view active">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:30px;">
-      <h2 style="font-size:28px;">My Gallery</h2>
-      <button class="btn" style="background:var(--s2); color:var(--acc);" onclick="switchTab('editor')">+ 新規作成</button>
-    </div>
-    <div id="galleryGrid" class="grid"></div>
-  </div>
-
-  <div id="view-editor" class="view">
-    <div class="sidebar">
-      <div>
-        <span class="sec-title">画像ソース</span>
-        <div class="drop" onclick="document.getElementById('fi').click()">
-          画像をアップロード、またはクリック
-          <input type="file" id="fi" style="display:none" accept="image/*">
-        </div>
-        <img id="prevImg">
-      </div>
-
-      <div>
-        <span class="sec-title">描画パラメータ</span>
-        <div class="ctrl-item">
-          <div class="ctrl-head"><span>解像度（幅）</span><span id="v-ws" class="ctrl-val">120</span></div>
-          <input type="range" id="ws" min="50" max="300" value="120">
-        </div>
-        <div class="ctrl-item">
-          <div class="ctrl-head"><span>劇画エッジ強度</span><span id="v-egs" class="ctrl-val">180</span></div>
-          <input type="range" id="egs" min="50" max="250" value="180">
-        </div>
-        <div class="ctrl-item">
-          <div class="ctrl-head"><span>インク密度（ガンマ）</span><span id="v-gms" class="ctrl-val">65</span></div>
-          <input type="range" id="gms" min="10" max="150" value="65">
-        </div>
-        <div class="ctrl-item">
-          <div class="ctrl-head"><span>表示サイズ（ズーム）</span><span id="v-zm" class="ctrl-val">9px</span></div>
-          <input type="range" id="zm" min="4" max="20" value="9">
-        </div>
-      </div>
-
-      <button class="btn btn-p" onclick="saveArt()">クラウドに保存</button>
-    </div>
-
-    <div class="stage">
-      <div class="stage-bar">
-        <span id="stats">0 x 0 構成</span>
-        <div style="flex:1; text-align:center; color:var(--acc); font-weight:bold;">リアルタイム・レンダリング中</div>
-        <button class="tab" onclick="copyAA()" style="background:var(--s2); padding:4px 10px;">コピー</button>
-      </div>
-      <div class="stage-content">
-        <pre id="aout"></pre>
-      </div>
+<!-- Firebase setup modal -->
+<div class="modal-bg" id="setupModal">
+  <div class="modal">
+    <button class="mclose" onclick="closeSetupModal()">✕</button>
+    <h3>// Firebase 設定</h3>
+    <p class="msub">
+      Googleログインを使うには Firebase プロジェクトの設定が必要です。<br>
+      <a href="https://console.firebase.google.com/" target="_blank">Firebase Console</a> でプロジェクトを作成し、
+      「Authentication → Sign-in method → Google」を有効化してから、
+      プロジェクト設定の「firebaseConfig」オブジェクトを以下に貼り付けてください。<br>
+      また、<strong>承認済みドメイン</strong>にこのページのドメインを追加してください。
+    </p>
+    <div id="cfgStatus" class="cfg-st"></div>
+    <label>firebaseConfig（JSON形式で貼り付け）</label>
+    <textarea id="fbCfgInput" placeholder='{
+  "apiKey": "AIza...",
+  "authDomain": "your-app.firebaseapp.com",
+  "projectId": "your-app",
+  "storageBucket": "your-app.appspot.com",
+  "messagingSenderId": "...",
+  "appId": "..."
+}'></textarea>
+    <div class="mactions">
+      <button class="mcancel" onclick="closeSetupModal()">キャンセル</button>
+      <button class="mok" onclick="saveFbCfg()">保存して接続</button>
     </div>
   </div>
 </div>
 
-<canvas id="cv" style="display:none"></canvas>
+<div class="main">
+
+  <!-- GALLERY -->
+  <div id="gv" class="on">
+    <div class="g-hdr">
+      <h2>// SAVED WORKS</h2>
+      <button class="btn-new" onclick="newProj()">＋ 新規作成</button>
+    </div>
+    <div id="gc"></div>
+  </div>
+
+  <!-- EDITOR -->
+  <div id="ev">
+    <div class="pleft">
+
+      <div class="psec">
+        <div class="slabel">画像</div>
+        <div class="dz" id="dz">
+          <span class="dz-icon">⬡</span>
+          <p>ドラッグ＆ドロップ<br>または <strong onclick="document.getElementById('fi').click()">ファイルを選択</strong></p>
+        </div>
+        <input type="file" id="fi" accept="image/*">
+        <img id="prev" alt="preview">
+      </div>
+
+      <div class="psec">
+        <div class="slabel">出力サイズ</div>
+        <div class="sr">
+          <label>幅（文字）</label>
+          <input type="range" id="ws" min="20" max="300" value="100">
+          <span class="sv" id="wv">100</span>
+        </div>
+      </div>
+
+      <div class="psec">
+        <div class="slabel">文字セット</div>
+        <select class="csel" id="cs">
+          <option value="standard">標準（10段階）</option>
+          <option value="dense">詳細（70段階）</option>
+          <option value="block">ブロック（░▒▓█）</option>
+          <option value="binary">バイナリ（0/1）</option>
+          <option value="dots">ブライユ点字</option>
+          <option value="katakana">カタカナ</option>
+          <option value="custom">カスタム入力</option>
+        </select>
+        <input type="text" class="cinput" id="cc" placeholder="明→暗の順で文字を入力">
+        <p class="chint" id="ch">全角・半角混在は自動調整されます</p>
+      </div>
+
+      <div class="psec">
+        <div class="slabel">補正</div>
+        <div class="sr">
+          <label>コントラスト</label>
+          <input type="range" id="cns" min="-100" max="100" value="0">
+          <span class="sv" id="cnv">0</span>
+        </div>
+        <div class="sr">
+          <label>明度</label>
+          <input type="range" id="brs" min="-100" max="100" value="0">
+          <span class="sv" id="brv">0</span>
+        </div>
+      </div>
+
+      <div class="psec">
+        <div class="slabel">オプション</div>
+        <div class="tr"><span>カラー出力</span>
+          <label class="tog"><input type="checkbox" id="ct"><div class="tog-t"></div></label></div>
+        <div class="tr"><span>白黒反転</span>
+          <label class="tog"><input type="checkbox" id="inv"><div class="tog-t"></div></label></div>
+        <div class="tr"><span>全角に統一</span>
+          <label class="tog"><input type="checkbox" id="fw"><div class="tog-t"></div></label></div>
+      </div>
+
+    </div><!-- /pleft -->
+
+    <div class="pright">
+      <div class="obar">
+        <span class="oinfo" id="oinfo">—</span>
+        <button class="obtn" onclick="copyA()">コピー</button>
+        <button class="obtn" onclick="dlTxt()">保存(.txt)</button>
+      </div>
+      <div class="fsr">
+        <label>表示サイズ</label>
+        <input type="range" id="fss" min="4" max="20" value="8">
+        <span class="sv" id="fsv">8px</span>
+      </div>
+      <div class="oscroll">
+        <div class="estate" id="est">
+          <div class="ec">░▒▓█</div>
+          <p>画像をアップロードすると<br>リアルタイムで生成されます</p>
+        </div>
+        <div class="ldng" id="ld">
+          <div class="dots"><span></span><span></span><span></span></div>
+          <span>変換中...</span>
+        </div>
+        <pre id="aout"></pre>
+      </div>
+    </div>
+  </div><!-- /ev -->
+
+</div><!-- /main -->
+
+<canvas id="cv"></canvas>
+<div class="toast" id="toast"></div>
 
 <script>
-  const CHARS = "$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/\\|()1{}[]?-_+~<>i!lI;:,\"^`'. ".split("");
-  let currentImg = null;
+// ─── CHARSETS ───────────────────────────────
+const CS = {
+  standard: ' .:-=+*#%@',
+  dense:    " .'`^\",:;Il!i><~+_-?][}{1)(|\\/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$",
+  block:    ' ░▒▓█',
+  binary:   '01',
+  dots:     '⠀⠁⠃⠇⠏⠟⠿⣿',
+  katakana: 'ｦｧｨｩｪｫｬｭｮｯｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ',
+};
 
-  window.switchTab = (id) => {
-    document.querySelectorAll('.tab, .view').forEach(el => el.classList.remove('active'));
-    document.getElementById('tab-' + id).classList.add('active');
-    document.getElementById('view-' + id).classList.add('active');
-  };
+// ─── STATE ──────────────────────────────────
+let img = null, rawAscii = '', projId = null, rtimer = null;
 
-  document.getElementById('fi').onchange = e => {
-    const reader = new FileReader();
-    reader.onload = ev => {
-      currentImg = new Image();
-      currentImg.onload = () => {
-        document.getElementById('prevImg').src = currentImg.src;
-        document.getElementById('prevImg').style.display = 'block';
-        render();
-      };
-      currentImg.src = ev.target.result;
-    };
-    reader.readAsDataURL(e.target.files[0]);
-  };
-
-  // すべてのスライダーでリアルタイム更新
-  ['ws', 'egs', 'gms', 'zm'].forEach(id => {
-    document.getElementById(id).oninput = () => {
-      const val = document.getElementById(id).value;
-      document.getElementById('v-' + id).textContent = id === 'zm' ? val + 'px' : val;
-      if (id === 'zm') {
-        document.getElementById('aout').style.fontSize = val + 'px';
-      } else {
-        render();
-      }
-    };
+// ─── TABS ───────────────────────────────────
+function showTab(t) {
+  ['g','e'].forEach(x => {
+    document.getElementById(x+'v').classList.toggle('on', x===t);
+    document.getElementById('t'+x).classList.toggle('on', x===t);
   });
+  document.getElementById('pnw').style.display    = t==='e' ? 'flex'  : 'none';
+  document.getElementById('sbtn').style.display   = t==='e' ? 'block' : 'none';
+  if (t==='g') renderGallery();
+}
 
-  function render() {
-    if (!currentImg) return;
-    const canvas = document.getElementById('cv');
-    const ctx = canvas.getContext('2d', { alpha: false });
-    const W = +document.getElementById('ws').value;
-    const edgeStr = +document.getElementById('egs').value;
-    const gamma = +document.getElementById('gms').value / 100;
-    
-    const H = Math.round(W * (currentImg.height / currentImg.width) * 0.54);
-    canvas.width = W; canvas.height = H;
-    document.getElementById('stats').textContent = `${W} x ${H} 文字`;
+function newProj() {
+  projId = null; img = null; rawAscii = '';
+  document.getElementById('pname').value = '';
+  document.getElementById('prev').style.display = 'none';
+  document.getElementById('dz').style.display   = '';
+  document.getElementById('aout').textContent   = '';
+  document.getElementById('aout').innerHTML     = '';
+  document.getElementById('est').style.display  = 'flex';
+  document.getElementById('ld').style.display   = 'none';
+  document.getElementById('oinfo').textContent  = '—';
+  showTab('e');
+}
 
-    // 劇画フィルター
-    ctx.filter = 'contrast(1.8) grayscale(1) brightness(0.8)';
-    ctx.drawImage(currentImg, 0, 0, W, H);
-    const data = ctx.getImageData(0, 0, W, H).data;
+// ─── IMAGE ──────────────────────────────────
+const dz = document.getElementById('dz');
+const fi = document.getElementById('fi');
 
-    let res = "";
-    for (let y = 0; y < H; y++) {
-      for (let x = 0; x < W; x++) {
-        const i = (y * W + x) * 4;
-        let e = 0;
-        // エッジ計算
-        if (x > 0 && y > 0 && x < W-1 && y < H-1) {
-          e = Math.abs(data[i] - data[i-4]) + Math.abs(data[i] - data[i+W*4]);
-        }
-        
-        if (e > (255 - edgeStr)) {
-          res += CHARS[0];
-        } else {
-          const v = Math.pow(data[i] / 255, gamma);
-          res += CHARS[Math.floor(v * (CHARS.length - 1))];
-        }
-      }
-      res += "\n";
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('dov'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('dov'));
+dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('dov'); loadFile(e.dataTransfer.files[0]); });
+fi.addEventListener('change', e => loadFile(e.target.files[0]));
+
+function loadFile(f) {
+  if (!f || !f.type.startsWith('image/')) return;
+  const r = new FileReader();
+  r.onload = ev => {
+    const i = new Image();
+    i.onload = () => {
+      img = i;
+      const p = document.getElementById('prev');
+      p.src = ev.target.result; p.style.display = 'block';
+      dz.style.display = 'none';
+      sched();
+    };
+    i.src = ev.target.result;
+  };
+  r.readAsDataURL(f);
+}
+
+// ─── CONTROLS → REALTIME ────────────────────
+function bindS(id, vid, sfx) {
+  const s = document.getElementById(id), v = document.getElementById(vid);
+  s.addEventListener('input', () => { v.textContent = s.value + (sfx||''); sched(); });
+}
+bindS('ws','wv'); bindS('cns','cnv'); bindS('brs','brv');
+
+document.getElementById('fss').addEventListener('input', function() {
+  const v = +this.value;
+  document.getElementById('fsv').textContent = v+'px';
+  applyFontSize(v);
+});
+
+document.getElementById('cs').addEventListener('change', function() {
+  const c = this.value==='custom';
+  document.getElementById('cc').style.display = c?'block':'none';
+  document.getElementById('ch').style.display = c?'block':'none';
+  sched();
+});
+document.getElementById('cc').addEventListener('input', sched);
+['ct','inv','fw'].forEach(id => document.getElementById(id).addEventListener('change', sched));
+
+function sched() {
+  if (!img) return;
+  clearTimeout(rtimer);
+  rtimer = setTimeout(render, 60);
+}
+
+function applyFontSize(v) {
+  const o = document.getElementById('aout');
+  o.style.fontSize   = v+'px';
+  o.style.lineHeight = v<=6?'1.06':v<=10?'1.0':'0.95';
+}
+
+// ─── CHAR WIDTH ──────────────────────────────
+function cw(ch) {
+  const cp = ch.codePointAt(0);
+  if (
+    (cp>=0x1100&&cp<=0x115F)||(cp>=0x2E80&&cp<=0x303F)||
+    (cp>=0x3040&&cp<=0x33FF)||(cp>=0x3400&&cp<=0x4DBF)||
+    (cp>=0x4E00&&cp<=0xA4FF)||(cp>=0xAC00&&cp<=0xD7AF)||
+    (cp>=0xF900&&cp<=0xFAFF)||(cp>=0xFE10&&cp<=0xFE1F)||
+    (cp>=0xFE30&&cp<=0xFE6F)||(cp>=0xFF01&&cp<=0xFF60)||
+    (cp>=0xFFE0&&cp<=0xFFE6)||(cp>=0x20000&&cp<=0x2CEAF)
+  ) return 2;
+  return 1;
+}
+
+function normRow(chars, targetCols) {
+  let used = 0, res = '';
+  for (const ch of chars) {
+    const w = cw(ch);
+    if (used + w > targetCols) break;
+    res += ch; used += w;
+  }
+  while (used < targetCols) { res += ' '; used++; }
+  return res;
+}
+
+// ─── RENDER ──────────────────────────────────
+function render() {
+  if (!img) return;
+  document.getElementById('est').style.display = 'none';
+  document.getElementById('ld').style.display  = 'flex';
+  document.getElementById('aout').textContent  = '';
+  document.getElementById('aout').innerHTML    = '';
+
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    const {plain, html} = buildAA();
+    rawAscii = plain;
+
+    document.getElementById('ld').style.display = 'none';
+    const o = document.getElementById('aout');
+    const fs = +document.getElementById('fss').value;
+    applyFontSize(fs);
+
+    if (document.getElementById('ct').checked) {
+      o.innerHTML = html;
+    } else {
+      o.textContent = plain;
     }
-    document.getElementById('aout').textContent = res;
+
+    const lines = plain.split('\n');
+    document.getElementById('oinfo').textContent =
+      `${(lines[0]||'').length} 文字 × ${lines.length} 行`;
+  }));
+}
+
+function buildAA() {
+  const canvas = document.getElementById('cv');
+  const ctx    = canvas.getContext('2d');
+
+  const W      = +document.getElementById('ws').value;
+  const csKey  = document.getElementById('cs').value;
+  let rawC     = csKey==='custom'
+    ? (document.getElementById('cc').value || CS.standard)
+    : CS[csKey];
+
+  const inv   = document.getElementById('inv').checked;
+  const color = document.getElementById('ct').checked;
+  const fwOn  = document.getElementById('fw').checked;
+  const ctrst = +document.getElementById('cns').value;
+  const brt   = +document.getElementById('brs').value;
+
+  if (inv) rawC = [...rawC].reverse().join('');
+  const ca = [...rawC];
+
+  // Detect width mixture
+  const hasFull = ca.some(c => cw(c)===2);
+  const hasHalf = ca.some(c => cw(c)===1);
+  const mixed   = hasFull && hasHalf;
+
+  // If all full-width: use half the pixel columns (each char = 2 cols)
+  const cellCols = (hasFull && !mixed && !fwOn) ? 2 : 1;
+  const pxW      = hasFull && !mixed && !fwOn ? Math.ceil(W/2) : W;
+  const tgtCols  = pxW * cellCols;
+
+  const ar  = img.height / img.width;
+  const hratio = cellCols===2 ? 0.88 : 0.44;
+  const pxH = Math.max(1, Math.round(pxW * ar * hratio));
+
+  canvas.width  = pxW;
+  canvas.height = pxH;
+  ctx.filter    = `contrast(${100+ctrst}%) brightness(${100+brt}%)`;
+  ctx.drawImage(img, 0, 0, pxW, pxH);
+  ctx.filter    = 'none';
+
+  const d = ctx.getImageData(0, 0, pxW, pxH).data;
+  const pl = [], hl = [];
+
+  for (let y = 0; y < pxH; y++) {
+    let pr = '', hr = '';
+    for (let x = 0; x < pxW; x++) {
+      const i   = (y*pxW+x)*4;
+      const r=d[i], g=d[i+1], b=d[i+2];
+      const lum = 0.299*r+0.587*g+0.114*b;
+      let ch = ca[Math.round((lum/255)*(ca.length-1))];
+
+      // Convert half→full if fwOn
+      if (fwOn && cw(ch)===1) {
+        const cp = ch.codePointAt(0);
+        if (cp>=0x21&&cp<=0x7E) ch = String.fromCodePoint(cp+0xFEE0);
+        else if (cp===0x20) ch = '　';
+      }
+
+      pr += ch;
+      if (color) hr += `<span style="color:rgb(${r},${g},${b})">${ch}</span>`;
+    }
+
+    // Normalise mixed-width rows
+    if (mixed && !fwOn) pr = normRow([...pr], tgtCols);
+
+    pl.push(pr);
+    if (color) hl.push(hr);
   }
 
-  window.copyAA = () => {
-    navigator.clipboard.writeText(document.getElementById('aout').textContent);
-    alert("コピーしました");
+  return { plain: pl.join('\n'), html: hl.join('\n') };
+}
+
+// ─── COPY / DOWNLOAD ─────────────────────────
+function copyA() {
+  if (!rawAscii) return;
+  navigator.clipboard.writeText(rawAscii).then(() => toast('✓ コピーしました'));
+}
+function dlTxt() {
+  if (!rawAscii) return;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([rawAscii],{type:'text/plain;charset=utf-8'}));
+  a.download = (document.getElementById('pname').value||'無題のAA')+'.txt';
+  a.click();
+}
+
+// ─── STORAGE ─────────────────────────────────
+const KEY = 'aa_gen_v2';
+const load = () => { try { return JSON.parse(localStorage.getItem(KEY))||[]; } catch { return []; } };
+const save = ps => localStorage.setItem(KEY, JSON.stringify(ps));
+
+function getSettings() {
+  return {
+    ws:+document.getElementById('ws').value,
+    cs:document.getElementById('cs').value,
+    cc:document.getElementById('cc').value,
+    cns:+document.getElementById('cns').value,
+    brs:+document.getElementById('brs').value,
+    ct:document.getElementById('ct').checked,
+    inv:document.getElementById('inv').checked,
+    fw:document.getElementById('fw').checked,
+    fs:+document.getElementById('fss').value,
   };
+}
+
+function applySettings(s) {
+  if (!s) return;
+  const set = (id, v) => { const el = document.getElementById(id); if(el) el.value = v; };
+  const setc = (id, v) => { const el = document.getElementById(id); if(el) el.checked = v; };
+  set('ws', s.ws??100); document.getElementById('wv').textContent = s.ws??100;
+  set('cs', s.cs??'standard');
+  set('cc', s.cc??'');
+  set('cns', s.cns??0); document.getElementById('cnv').textContent = s.cns??0;
+  set('brs', s.brs??0); document.getElementById('brv').textContent = s.brs??0;
+  setc('ct', !!s.ct); setc('inv', !!s.inv); setc('fw', !!s.fw);
+  set('fss', s.fs??8); document.getElementById('fsv').textContent = (s.fs??8)+'px';
+  const isC = s.cs==='custom';
+  document.getElementById('cc').style.display = isC?'block':'none';
+  document.getElementById('ch').style.display = isC?'block':'none';
+}
+
+function saveProj() {
+  if (!rawAscii) { toast('⚠ 先に画像をアップロードしてください'); return; }
+  const name = document.getElementById('pname').value.trim()||'無題のAA';
+  const ps   = load();
+  const prev = rawAscii.split('\n').slice(0, 50).join('\n');
+  const s    = getSettings();
+  if (projId) {
+    const idx = ps.findIndex(p=>p.id===projId);
+    if (idx>=0) ps[idx] = {...ps[idx], name, s, prev, u:Date.now()};
+  } else {
+    projId = Date.now().toString();
+    ps.unshift({id:projId, name, s, prev, c:Date.now(), u:Date.now()});
+  }
+  save(ps);
+  document.getElementById('pname').value = name;
+  toast('💾 保存しました：'+name);
+}
+
+function openProj(p) {
+  projId = p.id;
+  document.getElementById('pname').value = p.name;
+  applySettings(p.s);
+  img = null; rawAscii = p.prev||'';
+  document.getElementById('prev').style.display = 'none';
+  document.getElementById('dz').style.display   = '';
+  document.getElementById('est').style.display  = 'none';
+  document.getElementById('ld').style.display   = 'none';
+  const o = document.getElementById('aout');
+  applyFontSize(p.s?.fs??8);
+  o.textContent = rawAscii;
+  const lines = rawAscii.split('\n');
+  document.getElementById('oinfo').textContent =
+    `${(lines[0]||'').length} 文字 × ${lines.length} 行（保存済）`;
+  showTab('e');
+}
+
+function delProj(id, e) {
+  e.stopPropagation();
+  save(load().filter(p=>p.id!==id));
+  renderGallery();
+  toast('🗑 削除しました');
+}
+
+function renderGallery() {
+  const ps = load();
+  const gc = document.getElementById('gc');
+
+  if (!ps.length) {
+    gc.innerHTML = '';
+    gc.className = '';
+    const d = document.createElement('div');
+    d.className = 'g-empty';
+    d.innerHTML = '<div class="eg">░▒▓█</div><p>保存された作品がありません<br>エディターで作成して保存してください</p>';
+    gc.appendChild(d);
+    gc.style.cssText = 'display:flex;flex:1;';
+    return;
+  }
+
+  gc.style.cssText = '';
+  gc.className = 'g-grid';
+
+  gc.innerHTML = ps.map(p => {
+    const dt = new Date(p.u||p.c).toLocaleDateString('ja-JP');
+    const esc = (p.prev||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const pd  = encodeURIComponent(JSON.stringify(p));
+    return `
+<div class="card" onclick="openProj(JSON.parse(decodeURIComponent('${pd}')))">
+  <div class="card-prev">${esc}</div>
+  <div class="card-info">
+    <div class="card-name">${p.name.replace(/</g,'&lt;')}</div>
+    <div class="card-meta">${dt}</div>
+  </div>
+  <div class="card-del" onclick="delProj('${p.id}',event)">✕</div>
+</div>`;
+  }).join('');
+}
+
+// ─── TOAST ───────────────────────────────────
+let tt;
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(tt); tt = setTimeout(()=>t.classList.remove('show'), 2200);
+}
+
+// ─── FIREBASE SETUP MODAL ────────────────────
+function showSetupModal() {
+  const raw = localStorage.getItem('aa_fb_cfg');
+  const st  = document.getElementById('cfgStatus');
+  if (raw) {
+    try {
+      JSON.parse(raw);
+      st.className = 'cfg-st cfg-ok';
+      st.textContent = '✓ 設定済み（接続中）';
+      document.getElementById('fbCfgInput').value = JSON.stringify(JSON.parse(raw), null, 2);
+    } catch { st.className='cfg-st cfg-no'; st.textContent='⚠ 設定が無効です'; }
+  } else {
+    st.className = 'cfg-st cfg-no';
+    st.textContent = '未設定';
+    document.getElementById('fbCfgInput').value = '';
+  }
+  document.getElementById('setupModal').classList.add('open');
+}
+
+function closeSetupModal() {
+  document.getElementById('setupModal').classList.remove('open');
+}
+// Firebase設定（isasuke139さんのプロジェクト専用）
+const firebaseConfig = {
+  apiKey: "AIzaSyBO6zoUHt2TteX22WKFXaxC0wAzh8lEgtQ",
+  authDomain: "aa--generator.firebaseapp.com",
+  projectId: "aa--generator",
+  storageBucket: "aa--generator.firebasestorage.app",
+  messagingSenderId: "400807317542",
+  appId: "1:400807317542:web:85905aa007f22aa97a96e7",
+  measurementId: "G-QTS2JNGGK1"
+};
+
+// ページ読み込み時に自動でFirebaseを初期化
+if (!firebase.apps.length) {
+  firebase.initializeApp(firebaseConfig);
+  console.log("🔥 Firebase connected automatically!");
+}
+
+// 設定ボタン用の関数は空にしておく（今の設定を上書きさせないため）
+function saveFbCfg() {
+  closeSetupModal();
+}
+
+// Close modal on backdrop click
+document.getElementById('setupModal').addEventListener('click', function(e) {
+  if (e.target === this) closeSetupModal();
+});
+
+// ─── INIT ────────────────────────────────────
+renderGallery();
 </script>
 </body>
 </html>
