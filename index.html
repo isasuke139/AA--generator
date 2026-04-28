@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AA_GEN — Professional Edition</title>
+<title>AA_GEN — Ultimate Studio</title>
 <script type="module">
   import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
   import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
   import { getFirestore, collection, addDoc, query, where, getDocs, serverTimestamp, orderBy } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
-  // 初期設定（デフォルト）
-  const defaultConfig = {
+  // --- Firebase Config (isasuke139専用) ---
+  const firebaseConfig = {
     apiKey: "AIzaSyBO6zoUHt2TteX22WKFXaxC0wAzh8lEgtQ",
     authDomain: "aa--generator.firebaseapp.com",
     projectId: "aa--generator",
@@ -19,239 +19,173 @@
     appId: "1:400807317542:web:85905aa007f22aa97a96e7"
   };
 
-  window._fb = { auth: null, db: null, user: null, ready: false };
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
 
-  async function initFirebase(config) {
-    try {
-      const app = initializeApp(config || defaultConfig);
-      window._fb.auth = getAuth(app);
-      window._fb.db = getFirestore(app);
-      window._fb.ready = true;
+  window._fb = { auth, db, user: null };
 
-      onAuthStateChanged(window._fb.auth, user => {
-        window._fb.user = user;
-        updateUI();
-        if (user) loadGallery();
-      });
-      console.log("Firebase Connected");
-    } catch (e) {
-      console.error("Connection Failed", e);
-    }
-  }
-
-  window.handleAuth = async () => {
-    if (!window._fb.ready) return showSetup();
-    try {
-      if (window._fb.user) await signOut(window._fb.auth);
-      else await signInWithPopup(window._fb.auth, new GoogleAuthProvider());
-    } catch (e) { alert(e.message); }
-  };
-
-  // モーダル制御
-  window.showSetup = () => document.getElementById('modal').classList.add('open');
-  window.closeSetup = () => document.getElementById('modal').classList.remove('open');
-  window.saveConfig = () => {
-    const val = document.getElementById('cfgInput').value;
-    try {
-      const cfg = JSON.parse(val);
-      localStorage.setItem('aa_fb_cfg', val);
-      location.reload();
-    } catch (e) { alert("JSON形式が正しくありません"); }
-  };
-
-  const saved = localStorage.getItem('aa_fb_cfg');
-  initFirebase(saved ? JSON.parse(saved) : null);
-
-  function updateUI() {
-    const user = window._fb.user;
+  onAuthStateChanged(auth, user => {
+    window._fb.user = user;
     const btn = document.getElementById('authBtn');
-    const info = document.getElementById('uInfo');
-    btn.textContent = user ? 'LOGOUT' : 'LOGIN';
+    const uInfo = document.getElementById('uInfo');
+    btn.textContent = user ? 'ログアウト' : 'Googleログイン';
     if (user) {
-      info.innerHTML = `<img src="${user.photoURL}" style="width:28px;border-radius:50%;border:1px solid var(--acc)"><span>${user.displayName}</span>`;
-      info.style.display = 'flex';
+      uInfo.innerHTML = `<img src="${user.photoURL}" style="width:28px;border-radius:50%;border:1px solid var(--acc)"><span>${user.displayName}</span>`;
+      loadGallery();
     } else {
-      info.style.display = 'none';
+      uInfo.innerHTML = '';
     }
-  }
+  });
 
-  // Firestore連携
+  window.handleAuth = () => window._fb.user ? signOut(auth) : signInWithPopup(auth, new GoogleAuthProvider());
+
   window.saveArt = async () => {
     if (!window._fb.user) return alert("ログインが必要です");
-    const name = prompt("作品タイトル", "Gekiga Art " + new Date().toLocaleTimeString());
+    const name = prompt("作品タイトルを入力", "劇画作品 " + new Date().toLocaleTimeString());
     if (!name) return;
     try {
-      await addDoc(collection(window._fb.db, "projects"), {
+      await addDoc(collection(db, "projects"), {
         uid: window._fb.user.uid,
         name: name,
         ascii: document.getElementById('aout').textContent,
-        createdAt: serverTimestamp(),
-        settings: { ws: document.getElementById('ws').value, egs: document.getElementById('egs').value }
+        createdAt: serverTimestamp()
       });
-      alert("保存完了");
+      alert("クラウドに保存しました");
       loadGallery();
-    } catch (e) { console.error(e); }
+    } catch (e) { alert("エラー: " + e.message); }
   };
 
   async function loadGallery() {
     const grid = document.getElementById('galleryGrid');
-    grid.innerHTML = '<div class="loading">SYNCING...</div>';
-    const q = query(collection(window._fb.db, "projects"), where("uid", "==", window._fb.user.uid), orderBy("createdAt", "desc"));
+    grid.innerHTML = '<div style="color:var(--dim)">読み込み中...</div>';
+    const q = query(collection(db, "projects"), where("uid", "==", window._fb.user.uid), orderBy("createdAt", "desc"));
     const snap = await getDocs(q);
     grid.innerHTML = '';
     snap.forEach(doc => {
       const p = doc.data();
       const div = document.createElement('div');
       div.className = 'g-card';
-      div.innerHTML = `
-        <div class="g-thumb"><pre>${p.ascii.substring(0, 150)}</pre></div>
-        <div class="g-meta">
-          <div class="g-title">${p.name}</div>
-          <div class="g-date">${p.createdAt?.toDate().toLocaleDateString()}</div>
-        </div>
-      `;
-      div.onclick = () => {
-        document.getElementById('aout').textContent = p.ascii;
-        switchTab('editor');
-      };
+      div.innerHTML = `<div class="g-thumb"><pre>${p.ascii.substring(0, 100)}</pre></div><div class="g-title">${p.name}</div>`;
+      div.onclick = () => { document.getElementById('aout').textContent = p.ascii; switchTab('editor'); };
       grid.appendChild(div);
     });
   }
 </script>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap');
   :root {
-    --bg: #06060a; --s1: #0e0e16; --s2: #161624; --acc: #7affb2; --acc-dim: rgba(122, 255, 178, 0.1);
-    --text: #e0e0f0; --dim: #606080; --border: #202035; --grad: linear-gradient(135deg, #7affb2, #56ccf2);
+    --bg: #06060a; --s1: #0e0e16; --s2: #161624; --acc: #7affb2; --dim: #606080;
+    --text: #e0e0f0; --border: #202035; --grad: linear-gradient(135deg, #7affb2, #56ccf2);
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: var(--bg); color: var(--text); font-family: 'Zen Kaku Gothic New', sans-serif; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+  body { background: var(--bg); color: var(--text); font-family: sans-serif; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
 
-  /* Header */
-  header { height: 60px; background: var(--s1); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 25px; gap: 20px; z-index: 100; box-shadow: 0 4px 20px rgba(0,0,0,0.4); }
-  .logo { font-family: 'JetBrains Mono', monospace; font-weight: 800; font-size: 20px; background: var(--grad); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  header { height: 60px; background: var(--s1); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 25px; gap: 20px; z-index: 100; }
+  .logo { font-weight: 800; font-size: 18px; color: var(--acc); letter-spacing: 1px; }
   .tabs { display: flex; background: #000; padding: 4px; border-radius: 10px; border: 1px solid var(--border); }
-  .tab { border: none; background: none; color: var(--dim); padding: 8px 20px; border-radius: 7px; cursor: pointer; font-weight: bold; font-size: 13px; transition: 0.3s; }
-  .tab.active { background: var(--s2); color: var(--acc); box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
-  
-  .header-right { flex: 1; display: flex; justify-content: flex-end; align-items: center; gap: 20px; }
-  #uInfo { display: flex; align-items: center; gap: 10px; font-size: 12px; font-weight: bold; color: var(--dim); }
+  .tab { border: none; background: none; color: var(--dim); padding: 8px 18px; border-radius: 7px; cursor: pointer; font-weight: bold; font-size: 12px; }
+  .tab.active { background: var(--s2); color: var(--acc); }
 
-  /* Layout */
   .container { flex: 1; display: flex; overflow: hidden; position: relative; }
-  .view { position: absolute; inset: 0; opacity: 0; pointer-events: none; transition: 0.4s cubic-bezier(0.4, 0, 0.2, 1); transform: translateY(10px); }
-  .view.active { opacity: 1; pointer-events: auto; transform: translateY(0); }
+  .view { position: absolute; inset: 0; opacity: 0; pointer-events: none; display: flex; }
+  .view.active { opacity: 1; pointer-events: auto; }
 
-  /* Editor Sidebar */
-  .sidebar { width: 320px; background: var(--s1); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow-y: auto; }
-  .sec { padding: 25px; border-bottom: 1px solid var(--border); }
-  .sec-title { font-size: 10px; font-weight: 800; color: var(--dim); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 15px; display: block; }
+  /* サイドバー */
+  .sidebar { width: 320px; background: var(--s1); border-right: 1px solid var(--border); overflow-y: auto; padding: 25px; display: flex; flex-direction: column; gap: 25px; }
+  .sec-title { font-size: 10px; font-weight: 800; color: var(--dim); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 15px; display: block; }
   
-  .drop { border: 2px dashed var(--border); border-radius: 12px; padding: 30px 15px; text-align: center; color: var(--dim); cursor: pointer; transition: 0.3s; }
-  .drop:hover { border-color: var(--acc); color: var(--text); background: var(--acc-dim); }
+  .drop { border: 2px dashed var(--border); border-radius: 12px; padding: 30px 10px; text-align: center; color: var(--dim); cursor: pointer; transition: 0.3s; font-size: 12px; }
+  .drop:hover { border-color: var(--acc); color: var(--text); }
   #prevImg { width: 100%; border-radius: 8px; margin-top: 15px; display: none; border: 1px solid var(--border); }
 
-  input[type=range] { width: 100%; height: 6px; background: #000; border-radius: 3px; appearance: none; outline: none; margin: 15px 0; }
-  input[type=range]::-webkit-slider-thumb { appearance: none; width: 18px; height: 18px; background: var(--acc); border-radius: 50%; cursor: pointer; box-shadow: 0 0 10px var(--acc); }
+  .ctrl-item { margin-bottom: 10px; }
+  .ctrl-head { display: flex; justify-content: space-between; font-size: 11px; font-weight: bold; margin-bottom: 8px; }
+  .ctrl-val { color: var(--acc); }
+  input[type=range] { width: 100%; height: 6px; background: #000; border-radius: 3px; appearance: none; outline: none; accent-color: var(--acc); }
 
-  /* Output Canvas */
-  .stage { flex: 1; background: #000; position: relative; overflow: hidden; display: flex; flex-direction: column; }
-  .stage-bar { height: 45px; background: var(--s1); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 20px; justify-content: space-between; }
-  .stage-content { flex: 1; overflow: auto; padding: 40px; display: flex; align-items: flex-start; justify-content: center; }
-  #aout { font-family: 'JetBrains Mono', monospace; font-size: 9px; line-height: 0.82; white-space: pre; color: #fff; letter-spacing: -1.2px; text-shadow: 0 0 5px rgba(255,255,255,0.1); }
+  /* メイン出力 */
+  .stage { flex: 1; background: #000; display: flex; flex-direction: column; overflow: hidden; }
+  .stage-bar { height: 45px; background: var(--s1); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 20px; justify-content: space-between; font-size: 11px; color: var(--dim); }
+  .stage-content { flex: 1; overflow: auto; padding: 30px; display: flex; align-items: flex-start; justify-content: center; }
+  #aout { font-family: 'Courier New', monospace; font-size: 9px; line-height: 0.82; white-space: pre; color: #fff; letter-spacing: -1.2px; }
 
-  /* Gallery */
-  #gallery { padding: 40px; overflow-y: auto; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 25px; }
-  .g-card { background: var(--s1); border: 1px solid var(--border); border-radius: 15px; overflow: hidden; cursor: pointer; transition: 0.3s; }
-  .g-card:hover { transform: translateY(-5px); border-color: var(--acc); box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-  .g-thumb { height: 140px; background: #000; overflow: hidden; padding: 10px; opacity: 0.6; }
-  .g-thumb pre { font-size: 2px; line-height: 1; color: #888; }
-  .g-meta { padding: 15px; }
-  .g-title { font-weight: bold; font-size: 14px; margin-bottom: 5px; }
-  .g-date { font-size: 11px; color: var(--dim); }
+  /* ギャラリー */
+  #view-gallery { padding: 40px; display: block; overflow-y: auto; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; }
+  .g-card { background: var(--s1); border: 1px solid var(--border); border-radius: 15px; padding: 15px; cursor: pointer; transition: 0.3s; }
+  .g-card:hover { border-color: var(--acc); transform: translateY(-3px); }
+  .g-thumb { height: 100px; background: #000; overflow: hidden; font-size: 2px; line-height: 1; color: #444; border-radius: 8px; margin-bottom: 10px; }
+  .g-title { font-weight: bold; font-size: 14px; }
 
-  /* Buttons & UI */
-  .btn { border: none; padding: 10px 20px; border-radius: 8px; font-weight: 800; cursor: pointer; transition: 0.2s; font-size: 12px; }
-  .btn-p { background: var(--grad); color: #000; }
-  .btn-s { background: var(--s2); color: var(--text); border: 1px solid var(--border); }
-  .btn:hover { opacity: 0.8; transform: scale(1.02); }
-
-  /* Modal */
-  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(10px); z-index: 1000; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: 0.3s; }
-  .modal-overlay.open { opacity: 1; pointer-events: auto; }
-  .modal-box { width: 500px; background: var(--s1); border: 1px solid var(--border); border-radius: 20px; padding: 35px; box-shadow: 0 20px 50px rgba(0,0,0,0.8); }
-  textarea { width: 100%; height: 200px; background: #000; border: 1px solid var(--border); border-radius: 10px; color: var(--acc); font-family: monospace; padding: 15px; margin: 20px 0; outline: none; }
+  .btn { border: none; padding: 10px 18px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 12px; transition: 0.2s; }
+  .btn-p { background: var(--grad); color: #000; width: 100%; }
 </style>
 </head>
 <body>
 
 <header>
-  <div class="logo">AA_GEN // PRO</div>
+  <div class="logo">AA_GEN // STUDIO</div>
   <div class="tabs">
-    <button class="tab active" id="tab-gallery" onclick="switchTab('gallery')">COLLECTION</button>
-    <button class="tab" id="tab-editor" onclick="switchTab('editor')">STUDIO</button>
+    <button class="tab active" id="tab-gallery" onclick="switchTab('gallery')">コレクション</button>
+    <button class="tab" id="tab-editor" onclick="switchTab('editor')">エディター</button>
   </div>
-  <div class="header-right">
-    <div id="uInfo"></div>
-    <button class="btn btn-s" id="authBtn" onclick="handleAuth()">LOGIN</button>
-    <button class="btn btn-s" onclick="showSetup()">⚙</button>
-  </div>
+  <div style="flex:1"></div>
+  <div id="uInfo" style="display:flex; align-items:center; gap:10px; font-size:12px; font-weight:bold; color:var(--dim);"></div>
+  <button id="authBtn" class="tab" style="border:1px solid var(--border); color:var(--text)" onclick="handleAuth()">ログイン</button>
 </header>
 
 <div class="container">
   <div id="view-gallery" class="view active">
-    <div id="gallery">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:40px;">
-        <h1 style="font-size:32px; letter-spacing:-1px;">My Gallery</h1>
-        <button class="btn btn-p" onclick="switchTab('editor')">+ CREATE NEW</button>
-      </div>
-      <div id="galleryGrid" class="grid"></div>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:30px;">
+      <h2 style="font-size:28px;">My Gallery</h2>
+      <button class="btn" style="background:var(--s2); color:var(--acc);" onclick="switchTab('editor')">+ 新規作成</button>
     </div>
+    <div id="galleryGrid" class="grid"></div>
   </div>
 
   <div id="view-editor" class="view">
     <div class="sidebar">
-      <div class="sec">
-        <span class="sec-title">Input Image</span>
+      <div>
+        <span class="sec-title">画像ソース</span>
         <div class="drop" onclick="document.getElementById('fi').click()">
-          DRAG & DROP OR CLICK
+          画像をアップロード、またはクリック
           <input type="file" id="fi" style="display:none" accept="image/*">
         </div>
         <img id="prevImg">
       </div>
-      <div class="sec">
-        <span class="sec-title">Resolution (Width)</span>
-        <input type="range" id="ws" min="50" max="300" value="140">
-        <span class="sec-title">Gekiga Edge Strength</span>
-        <input type="range" id="egs" min="50" max="250" value="180">
-        <span class="sec-title">Ink Density (Gamma)</span>
-        <input type="range" id="gms" min="10" max="150" value="65">
+
+      <div>
+        <span class="sec-title">描画パラメータ</span>
+        <div class="ctrl-item">
+          <div class="ctrl-head"><span>解像度（幅）</span><span id="v-ws" class="ctrl-val">120</span></div>
+          <input type="range" id="ws" min="50" max="300" value="120">
+        </div>
+        <div class="ctrl-item">
+          <div class="ctrl-head"><span>劇画エッジ強度</span><span id="v-egs" class="ctrl-val">180</span></div>
+          <input type="range" id="egs" min="50" max="250" value="180">
+        </div>
+        <div class="ctrl-item">
+          <div class="ctrl-head"><span>インク密度（ガンマ）</span><span id="v-gms" class="ctrl-val">65</span></div>
+          <input type="range" id="gms" min="10" max="150" value="65">
+        </div>
+        <div class="ctrl-item">
+          <div class="ctrl-head"><span>表示サイズ（ズーム）</span><span id="v-zm" class="ctrl-val">9px</span></div>
+          <input type="range" id="zm" min="4" max="20" value="9">
+        </div>
       </div>
-      <div class="sec">
-        <button class="btn btn-p" style="width:100%; padding:15px;" onclick="saveArt()">SAVE TO CLOUD</button>
-      </div>
+
+      <button class="btn btn-p" onclick="saveArt()">クラウドに保存</button>
     </div>
+
     <div class="stage">
       <div class="stage-bar">
-        <div id="stats" style="font-family:'JetBrains Mono'; font-size:10px; color:var(--dim);">0 x 0 px</div>
-        <button class="btn btn-s" style="padding:5px 12px;" onclick="copyAA()">COPY TO CLIPBOARD</button>
+        <span id="stats">0 x 0 構成</span>
+        <div style="flex:1; text-align:center; color:var(--acc); font-weight:bold;">リアルタイム・レンダリング中</div>
+        <button class="tab" onclick="copyAA()" style="background:var(--s2); padding:4px 10px;">コピー</button>
       </div>
       <div class="stage-content">
         <pre id="aout"></pre>
       </div>
-    </div>
-  </div>
-</div>
-
-<div class="modal-overlay" id="modal">
-  <div class="modal-box">
-    <h2 style="margin-bottom:10px; color:var(--acc);">Firebase Configuration</h2>
-    <p style="font-size:13px; color:var(--dim);">isasuke139さんのFirebaseプロジェクト設定(JSON)を貼り付けてください。</p>
-    <textarea id="cfgInput" placeholder='{ "apiKey": "..." }'></textarea>
-    <div style="display:flex; gap:10px; justify-content:flex-end;">
-      <button class="btn btn-s" onclick="closeSetup()">CANCEL</button>
-      <button class="btn btn-p" onclick="saveConfig()">APPLY & RELOAD</button>
     </div>
   </div>
 </div>
@@ -262,81 +196,82 @@
   const CHARS = "$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/\\|()1{}[]?-_+~<>i!lI;:,\"^`'. ".split("");
   let currentImg = null;
 
-  function switchTab(id) {
+  window.switchTab = (id) => {
     document.querySelectorAll('.tab, .view').forEach(el => el.classList.remove('active'));
     document.getElementById('tab-' + id).classList.add('active');
     document.getElementById('view-' + id).classList.add('active');
-  }
+  };
 
   document.getElementById('fi').onchange = e => {
-    const file = e.target.files[0];
-    if (!file) return;
     const reader = new FileReader();
     reader.onload = ev => {
       currentImg = new Image();
       currentImg.onload = () => {
-        const p = document.getElementById('prevImg');
-        p.src = currentImg.src;
-        p.style.display = 'block';
+        document.getElementById('prevImg').src = currentImg.src;
+        document.getElementById('prevImg').style.display = 'block';
         render();
       };
       currentImg.src = ev.target.result;
     };
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(e.target.files[0]);
   };
 
-  ['ws', 'egs', 'gms'].forEach(id => document.getElementById(id).oninput = render);
+  // すべてのスライダーでリアルタイム更新
+  ['ws', 'egs', 'gms', 'zm'].forEach(id => {
+    document.getElementById(id).oninput = () => {
+      const val = document.getElementById(id).value;
+      document.getElementById('v-' + id).textContent = id === 'zm' ? val + 'px' : val;
+      if (id === 'zm') {
+        document.getElementById('aout').style.fontSize = val + 'px';
+      } else {
+        render();
+      }
+    };
+  });
 
   function render() {
     if (!currentImg) return;
     const canvas = document.getElementById('cv');
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { alpha: false });
     const W = +document.getElementById('ws').value;
     const edgeStr = +document.getElementById('egs').value;
     const gamma = +document.getElementById('gms').value / 100;
     
     const H = Math.round(W * (currentImg.height / currentImg.width) * 0.54);
     canvas.width = W; canvas.height = H;
-    document.getElementById('stats').textContent = `${W} x ${H} chars`;
+    document.getElementById('stats').textContent = `${W} x ${H} 文字`;
 
-    ctx.filter = `contrast(180%) grayscale(100%) brightness(85%)`;
+    // 劇画フィルター
+    ctx.filter = 'contrast(1.8) grayscale(1) brightness(0.8)';
     ctx.drawImage(currentImg, 0, 0, W, H);
-    const src = ctx.getImageData(0, 0, W, H);
-    const data = src.data;
+    const data = ctx.getImageData(0, 0, W, H).data;
 
-    const edges = new Float32Array(W * H);
-    for (let y = 1; y < H - 1; y++) {
-      for (let x = 1; x < W - 1; x++) {
-        const idx = (y * W + x) * 4;
-        const gx = -data[((y-1)*W+x-1)*4] + data[((y-1)*W+x+1)*4] - 2*data[(y*W+x-1)*4] + 2*data[(y*W+x+1)*4];
-        const gy = -data[((y-1)*W+x-1)*4] - 2*data[((y-1)*W+x)*4] + data[((y+1)*W+x-1)*4] + 2*data[((y+1)*W+x)*4];
-        edges[y * W + x] = Math.sqrt(gx*gx + gy*gy);
-      }
-    }
-
-    let result = "";
+    let res = "";
     for (let y = 0; y < H; y++) {
       for (let x = 0; x < W; x++) {
-        const i = y * W + x;
-        const lum = data[i * 4];
-        const e = edges[i];
-        let charIdx;
-        if (e > (255 - edgeStr)) charIdx = 0; 
-        else {
-          const v = Math.pow(lum / 255, gamma);
-          charIdx = Math.floor(v * (CHARS.length - 1));
+        const i = (y * W + x) * 4;
+        let e = 0;
+        // エッジ計算
+        if (x > 0 && y > 0 && x < W-1 && y < H-1) {
+          e = Math.abs(data[i] - data[i-4]) + Math.abs(data[i] - data[i+W*4]);
         }
-        result += CHARS[charIdx];
+        
+        if (e > (255 - edgeStr)) {
+          res += CHARS[0];
+        } else {
+          const v = Math.pow(data[i] / 255, gamma);
+          res += CHARS[Math.floor(v * (CHARS.length - 1))];
+        }
       }
-      result += "\n";
+      res += "\n";
     }
-    document.getElementById('aout').textContent = result;
+    document.getElementById('aout').textContent = res;
   }
 
-  function copyAA() {
+  window.copyAA = () => {
     navigator.clipboard.writeText(document.getElementById('aout').textContent);
-    alert("ASCII ART COPIED!");
-  }
+    alert("コピーしました");
+  };
 </script>
 </body>
 </html>
