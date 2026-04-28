@@ -506,7 +506,7 @@ canvas{display:none;}
         <div class="tr"><span>白黒反転</span>
           <label class="tog"><input type="checkbox" id="inv"><div class="tog-t"></div></label></div>
         <div class="tr"><span>全角に統一</span>
-          <label class="tog"><input type="checkbox" id="fw"><div class="tog-t"></div></label></div>
+          <label class="tog"><input type="checkbox" id="fw" checked><div class="tog-t"></div></label></div>
       </div>
     </div>
     <div class="pright">
@@ -604,62 +604,66 @@ function loadFile(f) {
 // ─── CONTROLS ──────────────────────────────
 function bindS(id, vid, sfx) {
   const s = document.getElementById(id), v = document.getElementById(vid);
-  s.addEventListener('input', () => { v.textContent = s.value + (sfx||''); sched(); });
+  s.addEventListener('input', () => { v.textContent = s.value + (sfx || ''); sched(); });
 }
-bindS('ws','wv'); bindS('cns','cnv'); bindS('brs','brv');
-document.getElementById('fss').addEventListener('input', function() {
-  document.getElementById('fsv').textContent = this.value+'px';
-  applyFontSize(+this.value);
-});
-document.getElementById('cs').addEventListener('change', function() {
-  const c = this.value==='custom';
-  document.getElementById('cc').style.display = c?'block':'none';
-  document.getElementById('ch').style.display = c?'block':'none';
+bindS('ws', 'wv');
+bindS('cns', 'cnv');
+bindS('brs', 'brv');
+bindS('fss', 'fsv', 'px');
+document.getElementById('cs').onchange = () => {
+  const isC = document.getElementById('cs').value === 'custom';
+  document.getElementById('cc').style.display = isC ? 'block' : 'none';
+  document.getElementById('ch').style.display = isC ? 'block' : 'none';
   sched();
+};
+document.getElementById('cc').oninput = sched;
+document.getElementById('ct').onchange = sched;
+document.getElementById('inv').onchange = sched;
+document.getElementById('fw').onchange = sched;
+document.getElementById('fss').addEventListener('input', () => {
+  document.getElementById('aout').style.fontSize = document.getElementById('fss').value + 'px';
 });
-document.getElementById('cc').addEventListener('input', sched);
-['ct','inv','fw'].forEach(id => document.getElementById(id).addEventListener('change', sched));
 
-function sched() { if (img) { clearTimeout(rtimer); rtimer = setTimeout(render, 60); } }
-
-function applyFontSize(v) {
-  const o = document.getElementById('aout');
-  o.style.fontSize = v+'px';
-  o.style.lineHeight = v<=6?'1.06':v<=10?'1.0':'0.95';
+// ─── CORE LOGIC ─────────────────────────────
+function sched() {
+  if (!img) return;
+  if (rtimer) clearTimeout(rtimer);
+  document.getElementById('est').style.display = 'none';
+  document.getElementById('ld').style.display = 'flex';
+  rtimer = setTimeout(run, 50);
 }
 
-// ─── RENDER (エッジ検出 & コピー崩れ対策版) ───
+function run() {
+  const { plain, html } = buildAA();
+  rawAscii = plain;
+  document.getElementById('aout').innerHTML = html || plain;
+  document.getElementById('ld').style.display = 'none';
+  const lines = plain.split('\n');
+  document.getElementById('oinfo').textContent = `${lines[0].length} x ${lines.length} chars`;
+}
+
 function applyEdgeDetection(data, w, h, strength) {
-  if (strength <= 0) return data;
-  const copy = new Uint8ClampedArray(data);
+  const out = new Uint8ClampedArray(data.length);
   for (let y = 1; y < h - 1; y++) {
     for (let x = 1; x < w - 1; x++) {
       const i = (y * w + x) * 4;
-      const val = data[i] * 5 - data[i - w * 4] - data[i + w * 4] - data[i - 4] - data[i + 4];
-      const res = val * (strength / 50); 
-      const final = data[i] + (res - data[i]) * 0.5;
-      copy[i] = copy[i + 1] = copy[i + 2] = Math.max(0, Math.min(255, final));
+      // Sobelフィルタで境界線を探す
+      const gx = 
+        -1*data[((y-1)*w+(x-1))*4] + 1*data[((y-1)*w+(x+1))*4] +
+        -2*data[(y*w+(x-1))*4]     + 2*data[(y*w+(x+1))*4] +
+        -1*data[((y+1)*w+(x-1))*4] + 1*data[((y+1)*w+(x+1))*4];
+      const gy = 
+        -1*data[((y-1)*w+(x-1))*4] - 2*data[((y-1)*w+x)*4] - 1*data[((y-1)*w+(x+1))*4] +
+         1*data[((y+1)*w+(x-1))*4] + 2*data[((y+1)*w+x)*4] + 1*data[((y+1)*w+(x+1))*4];
+      
+      const edge = Math.sqrt(gx*gx + gy*gy);
+      // 元の明るさにエッジを「加算」する。エッジ部分はより暗く（またはより濃い文字に）なる。
+      const val = Math.max(0, Math.min(255, data[i] - (edge * (strength/100))));
+      out[i] = out[i+1] = out[i+2] = val;
+      out[i+3] = 255;
     }
   }
-  return copy;
-}
-
-function render() {
-  if (!img) return;
-  document.getElementById('est').style.display = 'none';
-  document.getElementById('ld').style.display = 'flex';
-  
-  requestAnimationFrame(() => {
-    const {plain, html} = buildAA();
-    rawAscii = plain;
-    document.getElementById('ld').style.display = 'none';
-    const o = document.getElementById('aout');
-    applyFontSize(+document.getElementById('fss').value);
-    if (document.getElementById('ct').checked) o.innerHTML = html;
-    else o.textContent = plain;
-    const lines = plain.split('\n');
-    document.getElementById('oinfo').textContent = `${(lines[0]||'').length} 文字 × ${lines.length} 行`;
-  });
+  return out;
 }
 
 function buildAA() {
@@ -667,7 +671,7 @@ function buildAA() {
   const ctx = canvas.getContext('2d');
   const W = +document.getElementById('ws').value;
   const csKey = document.getElementById('cs').value;
-  let rawC = csKey==='custom' ? (document.getElementById('cc').value || CS.standard) : CS[csKey];
+  let rawC = csKey === 'custom' ? (document.getElementById('cc').value || CS.standard) : CS[csKey];
   const inv = document.getElementById('inv').checked;
   const color = document.getElementById('ct').checked;
   const fwOn = document.getElementById('fw').checked;
@@ -689,7 +693,8 @@ function buildAA() {
   ctx.filter = 'none';
 
   const imageData = ctx.getImageData(0, 0, pxW, pxH);
-  const processedData = applyEdgeDetection(imageData.data, pxW, pxH, 40);
+  // 【修正】エッジを強調しつつ、元の階調を活かす
+  const processedData = applyEdgeDetection(imageData.data, pxW, pxH, 45);
 
   const pl = [], hl = [];
   for (let y = 0; y < pxH; y++) {
@@ -697,13 +702,19 @@ function buildAA() {
     for (let x = 0; x < pxW; x++) {
       const i = (y * pxW + x) * 4;
       const lum = processedData[i]; 
-      let ch = ca[Math.round((lum/255)*(ca.length-1))];
+      
+      // 元の明るさをそのままインデックスに使う
+      let idx = Math.floor((lum / 256) * ca.length);
+      let ch = ca[idx] || ca[ca.length-1];
 
       if (fwOn || csKey === 'dots' || csKey === 'katakana') {
         const cp = ch.codePointAt(0);
         if (cp >= 0x21 && cp <= 0x7E) ch = String.fromCodePoint(cp + 0xFEE0);
-        else if (ch === ' ') ch = '　';
+        else if (ch === ' ' || !ch) ch = '　'; 
+      } else {
+        if (!ch || ch === '') ch = ' ';
       }
+
       pr += ch;
       if (color) {
         const r = imageData.data[i], g = imageData.data[i+1], b = imageData.data[i+2];
@@ -716,123 +727,122 @@ function buildAA() {
   return { plain: pl.join('\n'), html: hl.join('\n') };
 }
 
-// ─── COPY / DOWNLOAD ─────────────────────────
+// ─── UTIL ───────────────────────────────────
 function copyA() {
-  if (!rawAscii) return;
-  if (!navigator.clipboard) {
-    const ta = document.createElement("textarea");
-    ta.value = rawAscii; document.body.appendChild(ta); ta.select();
-    document.execCommand("copy"); document.body.removeChild(ta);
-    toast('✓ コピーしました'); return;
-  }
-  navigator.clipboard.writeText(rawAscii).then(() => toast('✓ コピーしました'));
+  navigator.clipboard.writeText(rawAscii).then(() => toast('コピーしました！'));
 }
 function dlTxt() {
-  if (!rawAscii) return;
+  const b = new Blob([rawAscii], {type:'text/plain'});
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([rawAscii],{type:'text/plain;charset=utf-8'}));
-  a.download = (document.getElementById('pname').value||'無題のAA')+'.txt';
+  a.href = URL.createObjectURL(b);
+  a.download = (document.getElementById('pname').value || 'art') + '.txt';
   a.click();
 }
+function toast(m) {
+  const t = document.getElementById('toast');
+  t.textContent = m; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2000);
+}
 
-// ─── STORAGE ─────────────────────────────────
-const KEY = 'aa_gen_v2';
-const load = () => { try { return JSON.parse(localStorage.getItem(KEY))||[]; } catch { return []; } };
-const save = ps => localStorage.setItem(KEY, JSON.stringify(ps));
-
+// ─── GALLERY ────────────────────────────────
 function saveProj() {
-  if (!rawAscii) { toast('⚠ 先に画像をアップロードしてください'); return; }
-  const name = document.getElementById('pname').value.trim()||'無題のAA';
-  const ps = load();
-  const prev = rawAscii.split('\n').slice(0, 50).join('\n');
-  const s = {
-    ws:+document.getElementById('ws').value,
-    cs:document.getElementById('cs').value,
-    cc:document.getElementById('cc').value,
-    cns:+document.getElementById('cns').value,
-    brs:+document.getElementById('brs').value,
-    ct:document.getElementById('ct').checked,
-    inv:document.getElementById('inv').checked,
-    fw:document.getElementById('fw').checked,
-    fs:+document.getElementById('fss').value,
+  const n = document.getElementById('pname').value || '無題のAA';
+  const data = {
+    id: projId || Date.now().toString(),
+    name: n,
+    ascii: rawAscii,
+    date: new Date().toLocaleString()
   };
-  if (projId) {
-    const idx = ps.findIndex(p=>p.id===projId);
-    if (idx>=0) ps[idx] = {...ps[idx], name, s, prev, u:Date.now()};
-  } else {
-    projId = Date.now().toString();
-    ps.unshift({id:projId, name, s, prev, c:Date.now(), u:Date.now()});
-  }
-  save(ps);
-  toast('💾 保存しました：'+name);
+  let items = JSON.parse(localStorage.getItem('aa_items') || '[]');
+  const idx = items.findIndex(x => x.id === data.id);
+  if (idx > -1) items[idx] = data; else items.unshift(data);
+  localStorage.setItem('aa_items', JSON.stringify(items));
+  toast('保存しました');
 }
-
-function openProj(p) {
-  projId = p.id;
-  document.getElementById('pname').value = p.name;
-  const s = p.s || {};
-  document.getElementById('ws').value = s.ws||100;
-  document.getElementById('wv').textContent = s.ws||100;
-  document.getElementById('cs').value = s.cs||'standard';
-  document.getElementById('cns').value = s.cns||0;
-  document.getElementById('brs').value = s.brs||0;
-  document.getElementById('ct').checked = !!s.ct;
-  document.getElementById('inv').checked = !!s.inv;
-  document.getElementById('fw').checked = !!s.fw;
-  document.getElementById('fss').value = s.fs||8;
-  document.getElementById('fsv').textContent = (s.fs||8)+'px';
-  img = null; rawAscii = p.prev||'';
-  document.getElementById('prev').style.display = 'none';
-  document.getElementById('dz').style.display = '';
-  document.getElementById('est').style.display = 'none';
-  document.getElementById('ld').style.display = 'none';
-  const o = document.getElementById('aout');
-  applyFontSize(s.fs||8);
-  o.textContent = rawAscii;
-  showTab('e');
-}
-
-function delProj(id, e) { e.stopPropagation(); save(load().filter(p=>p.id!==id)); renderGallery(); toast('🗑 削除しました'); }
 
 function renderGallery() {
-  const ps = load();
-  const gc = document.getElementById('gc');
-  if (!ps.length) {
-    gc.innerHTML = '<div class="g-empty"><div class="eg">░▒▓█</div><p>作品がありません</p></div>';
+  const c = document.getElementById('gc');
+  const items = JSON.parse(localStorage.getItem('aa_items') || '[]');
+  if (!items.length) {
+    c.innerHTML = '<div class="g-empty"><div class="eg">⬡</div><p>保存された作品はありません</p></div>';
     return;
   }
-  gc.className = 'g-grid';
-  gc.innerHTML = ps.map(p => {
-    const esc = (p.prev||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    return `<div class="card" onclick='openProj(${JSON.stringify(p)})'>
-      <div class="card-prev">${esc}</div>
-      <div class="card-info"><div class="card-name">${p.name}</div></div>
-      <div class="card-del" onclick="delProj('${p.id}',event)">✕</div>
-    </div>`;
-  }).join('');
+  c.innerHTML = items.map(item => `
+    <div class="card" onclick="loadProj('${item.id}')">
+      <div class="card-prev">${item.ascii.substring(0, 500)}</div>
+      <div class="card-info">
+        <div class="card-name">${item.name}</div>
+        <div class="card-meta">${item.date}</div>
+      </div>
+      <div class="card-del" onclick="event.stopPropagation();delProj('${item.id}')">✕</div>
+    </div>
+  `).join('');
 }
 
-function toast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg; t.classList.add('show');
-  setTimeout(()=>t.classList.remove('show'), 2200);
+window.loadProj = (id) => {
+  const items = JSON.parse(localStorage.getItem('aa_items') || '[]');
+  const item = items.find(x => x.id === id);
+  if (!item) return;
+  projId = item.id;
+  document.getElementById('pname').value = item.name;
+  rawAscii = item.ascii;
+  document.getElementById('aout').textContent = rawAscii;
+  document.getElementById('est').style.display = 'none';
+  showTab('e');
+};
+
+window.delProj = (id) => {
+  if (!confirm('削除しますか？')) return;
+  let items = JSON.parse(localStorage.getItem('aa_items') || '[]');
+  items = items.filter(x => x.id !== id);
+  localStorage.setItem('aa_items', JSON.stringify(items));
+  renderGallery();
+};
+
+// ─── FIREBASE MODAL ─────────────────────────
+function showSetupModal() {
+  const raw = localStorage.getItem('fb_config');
+  const st  = document.getElementById('cfgStatus');
+  if (raw) {
+    try {
+      JSON.parse(raw);
+      st.className = 'cfg-st cfg-ok';
+      st.textContent = '✓ 設定済み（接続中）';
+      document.getElementById('fbCfgInput').value = JSON.stringify(JSON.parse(raw), null, 2);
+    } catch { st.className='cfg-st cfg-no'; st.textContent='⚠ 設定が無効です'; }
+  } else {
+    st.className = 'cfg-st cfg-no';
+    st.textContent = '未設定';
+    document.getElementById('fbCfgInput').value = '';
+  }
+  document.getElementById('setupModal').classList.add('open');
 }
 
-// ─── FIREBASE CONFIG ────────────────────────
+function closeSetupModal() {
+  document.getElementById('setupModal').classList.remove('open');
+}
+
+function saveFbCfg() {
+  const val = document.getElementById('fbCfgInput').value;
+  try {
+    JSON.parse(val);
+    localStorage.setItem('fb_config', val);
+    toast('設定を保存しました。再読み込みします...');
+    setTimeout(() => location.reload(), 1000);
+  } catch (e) { alert('JSONの形式が正しくありません'); }
+}
+
+// Firebase設定（isasuke139さんのプロジェクト専用）
 const firebaseConfig = {
   apiKey: "AIzaSyBO6zoUHt2TteX22WKFXaxC0wAzh8lEgtQ",
   authDomain: "aa--generator.firebaseapp.com",
   projectId: "aa--generator",
   storageBucket: "aa--generator.firebasestorage.app",
   messagingSenderId: "400807317542",
-  appId: "1:400807317542:web:85905aa007f22aa97a96e7"
+  appId: "1:400807317542:web:85905aa007f22aa97a96e7",
+  measurementId: "G-QTS2JNGGK1"
 };
 
-function showSetupModal() { document.getElementById('setupModal').classList.add('open'); }
-function closeSetupModal() { document.getElementById('setupModal').classList.remove('open'); }
-function saveFbCfg() { closeSetupModal(); }
-
-// ─── INIT ────────────────────────────────────
 renderGallery();
 </script>
 </body>
